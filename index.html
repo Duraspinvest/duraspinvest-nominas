@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duraspinvest · Nóminas</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2325406e'/%3E%3Cstop offset='1' stop-color='%2316233f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='31' font-family='Georgia,serif' font-size='19' font-weight='bold' text-anchor='middle' fill='%23ffffff'%3E%3Ctspan fill-opacity='0.9'%3EE%3C/tspan%3E%3Ctspan fill-opacity='0.35'%3ED%3C/tspan%3E%3Ctspan fill-opacity='0.6'%3EG%3C/tspan%3E%3C/text%3E%3Ctext x='32' y='50' font-family='Arial,sans-serif' font-size='13' font-weight='bold' text-anchor='middle' fill='%23D4A017'%3ENÓM%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1B2A4A">
+<style>
+:root{--navy:#1B2A4A;--navy-mid:#2a3f66;--gold:#D4A017;--accent:#D4A017;--gray-50:#f8f9fb;--gray-100:#f1f3f7;--gray-200:#e2e6ee;--gray-400:#8a93a6;--gray-600:#4b5567;--success:#1f9d57;--warning:#c47f17;--danger:#b91c1c;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--gray-100);color:var(--navy);font-size:14px;}
+.topbar{background:var(--navy);padding:12px 22px;display:flex;align-items:center;gap:16px;}
+.logo-box{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#25406e,#152banks 0%);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;color:#fff;font-weight:bold;}
+.logo-name{color:#fff;font-size:14px;font-weight:600;}
+.logo-sub{color:#9fb0cc;font-size:11px;}
+.appswitch{margin-left:auto;display:flex;gap:6px;background:#122038;border-radius:9px;padding:4px;}
+.appswitch a{color:#cdd7e8;font-size:12px;font-weight:600;text-decoration:none;padding:6px 13px;border-radius:6px;}
+.appswitch a:hover{background:#25406e;color:#fff;}
+.appswitch a.cur{background:var(--gold);color:var(--navy);}
+nav{background:var(--navy-mid);padding:0 18px;display:flex;gap:2px;overflow-x:auto;}
+.nav-btn{padding:11px 18px;color:#a9b6cf;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;}
+.nav-btn:hover{color:#fff;}
+.nav-btn.active{color:#fff;border-bottom-color:var(--gold);}
+.wrap{max-width:1120px;margin:22px auto;padding:0 18px;}
+.section{display:none;}
+.section.active{display:block;}
+.card{background:#fff;border-radius:12px;padding:20px 22px;box-shadow:0 1px 3px rgba(20,30,60,.06);margin-bottom:18px;}
+h2{font-size:16px;color:var(--navy);margin-bottom:4px;}
+.sub{font-size:12px;color:var(--gray-400);margin-bottom:14px;}
+.filtros{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fl{font-size:11px;font-weight:600;color:var(--gray-600);text-transform:uppercase;letter-spacing:.4px;}
+.fi{padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;background:#fff;min-width:150px;}
+.fi2{padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;}
+.btn{padding:9px 16px;border-radius:8px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:#25406e;}
+.btn-secondary{background:#fff;color:var(--navy);border-color:var(--gray-200);}
+.btn-gold{background:var(--gold);color:var(--navy);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-100);}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-400);}
+.td-r{text-align:right;}
+.tabla-wrapper{overflow-x:auto;}
+.mg2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.mg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.modal{display:none;position:fixed;inset:0;background:rgba(20,30,60,.4);z-index:50;align-items:flex-start;justify-content:center;padding:30px 14px;overflow:auto;}
+.modal.open{display:flex;}
+.modal-box{background:#fff;border-radius:14px;padding:22px;max-width:640px;width:100%;box-shadow:0 10px 40px rgba(20,30,60,.25);}
+.modal-title{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:14px;}
+.ma{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center;}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;}
+.recibo{border:1px solid var(--gray-200);border-radius:10px;padding:18px;}
+.recibo .rl{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;}
+.recibo .rl.tot{font-weight:700;border-top:1px solid var(--gray-200);margin-top:4px;padding-top:6px;}
+.recibo h3{font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;}
+.empty{padding:30px;text-align:center;color:var(--gray-400);font-size:13px;}
+.warn{background:#fff8e6;border-left:3px solid var(--gold);padding:8px 12px;border-radius:6px;font-size:12px;color:var(--gray-600);margin:8px 0;}
+/* recibo oficial */
+.nom{border:1px solid #333;font-size:11.5px;color:#111;background:#fff;max-width:720px;}
+.nom .hd{display:flex;border-bottom:1px solid #333;}
+.nom .hd>div{padding:6px 10px;}
+.nom .box{border:1px solid #999;margin:0;}
+.nom table{width:100%;border-collapse:collapse;}
+.nom td,.nom th{border:1px solid #ccc;padding:3px 7px;font-size:11.5px;}
+.nom .sec{background:#eef1f6;font-weight:700;padding:3px 8px;border-top:1px solid #333;}
+.nom .rr td:last-child{text-align:right;}
+.nom .tt{font-weight:700;background:#f7f9fc;}
+@media print{
+  body{background:#fff;}
+  body *{visibility:hidden;}
+  #printArea,#printArea *{visibility:visible;}
+  #printArea{position:absolute;left:0;top:0;width:100%;}
+  .no-print{display:none!important;}
+  @page{margin:12mm;}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
+  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.01b</div></div>
+  <div class="appswitch">
+    <a href="https://duraspinvest.github.io/duraspinvest/">Tareas</a>
+    <a href="https://duraspinvest.github.io/duraspinvest-iva/">IVA</a>
+    <a class="cur">Nóminas</a>
+  </div>
+</div>
+<nav>
+  <button class="nav-btn active" onclick="showSec('empresas',this)">Empresas</button>
+  <button class="nav-btn" onclick="showSec('trab',this)">Trabajadores</button>
+  <button class="nav-btn" onclick="showSec('nomina',this)">Nómina</button>
+  <button class="nav-btn" onclick="showSec('ss',this)">Seguros sociales</button>
+</nav>
+<div class="wrap">
+
+  <!-- EMPRESAS -->
+  <div id="empresas" class="section active">
+    <div class="card">
+      <h2>Empresas (clientes con trabajadores)</h2>
+      <div class="sub">Configura los datos de cotización de cada empresa. Los clientes vienen de la app de Tareas.</div>
+      <div class="filtros">
+        <div class="fg"><span class="fl">Empresa</span>
+          <select class="fi" id="empSel" onchange="renderEmpForm()" style="min-width:260px;"><option value="">Seleccionar...</option></select></div>
+      </div>
+      <div id="empForm"></div>
+    </div>
+  </div>
+
+  <!-- TRABAJADORES -->
+  <div id="trab" class="section">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;">
+        <div><h2>Trabajadores</h2><div class="sub">Alta y datos de cada trabajador por empresa.</div></div>
+        <button class="btn btn-primary" onclick="openTrab()">+ Nuevo trabajador</button>
+      </div>
+      <div class="filtros" style="margin-top:8px;">
+        <div class="fg"><span class="fl">Empresa</span>
+          <select class="fi" id="trFC" onchange="renderTrab()" style="min-width:260px;"><option value="">Todas</option></select></div>
+      </div>
+      <div class="tabla-wrapper"><table><thead><tr><th>Trabajador</th><th>Empresa</th><th>Categoría</th><th class="td-c">Gr.cot</th><th class="td-r">Salario base</th><th class="td-r">Prorrata pagas</th><th class="td-c">% IRPF</th><th></th></tr></thead>
+      <tbody id="trBody"><tr><td colspan="8"><div class="empty">Sin trabajadores.</div></td></tr></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- NOMINA -->
+  <div id="nomina" class="section">
+    <div class="card">
+      <h2>Nómina mensual</h2>
+      <div class="sub">Selecciona empresa, trabajador y mes. El cálculo cuadra con el RNT/RLC (base con prorrata de pagas).</div>
+      <div class="filtros">
+        <div class="fg"><span class="fl">Empresa</span><select class="fi" id="nEmp" onchange="fillNTrab()"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Trabajador</span><select class="fi" id="nTrab"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Mes</span><select class="fi" id="nMes"></select></div>
+        <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcNominaUI()">Calcular</button></div>
+      </div>
+      <div id="nRes"></div>
+    </div>
+  </div>
+
+  <!-- SEGUROS SOCIALES -->
+  <div id="ss" class="section">
+    <div class="card">
+      <h2>Seguros sociales (RLC) por empresa</h2>
+      <div class="sub">Resumen mensual de bases y cuotas de todos los trabajadores de la empresa, como el recibo de liquidación para el Sistema RED.</div>
+      <div class="filtros">
+        <div class="fg"><span class="fl">Empresa</span><select class="fi" id="sEmp"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Mes</span><select class="fi" id="sMes"></select></div>
+        <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcSS()">Calcular</button></div>
+      </div>
+      <div id="sRes"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL TRABAJADOR -->
+<div class="modal" id="trModal">
+  <div class="modal-box">
+    <div class="modal-title" id="trTitle">Nuevo trabajador</div>
+    <input type="hidden" id="tId">
+    <div class="mg2">
+      <div class="fg"><label class="fl">Empresa *</label><select class="fi2" id="tEmp"></select></div>
+      <div class="fg"><label class="fl">Nombre y apellidos *</label><input class="fi2" id="tNom"></div>
+      <div class="fg"><label class="fl">DNI/NIE</label><input class="fi2" id="tDni"></div>
+      <div class="fg"><label class="fl">NAF (nº afiliación SS)</label><input class="fi2" id="tNaf"></div>
+      <div class="fg"><label class="fl">Categoría / convenio</label><input class="fi2" id="tCat"></div>
+      <div class="fg"><label class="fl">Grupo de cotización (1-11)</label><input type="number" class="fi2" id="tGrupo" value="9"></div>
+      <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
+      <div class="fg"><label class="fl">Tipo de contrato</label><select class="fi2" id="tContrato"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option></select></div>
+      <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
+      <div class="fg"><label class="fl">% de retención IRPF</label><input type="number" step="0.01" class="fi2" id="tIrpf" value="0"></div>
+    </div>
+    <div style="font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;">Devengos mensuales</div>
+    <div class="mg3">
+      <div class="fg"><label class="fl">Salario base</label><input type="number" step="0.01" class="fi2" id="tSalBase" value="0"></div>
+      <div class="fg"><label class="fl">Plus convenio</label><input type="number" step="0.01" class="fi2" id="tPlusConv" value="0"></div>
+      <div class="fg"><label class="fl">Otros pluses salariales</label><input type="number" step="0.01" class="fi2" id="tOtros" value="0"></div>
+      <div class="fg"><label class="fl">Plus transporte (no cotiza)</label><input type="number" step="0.01" class="fi2" id="tTransporte" value="0"></div>
+      <div class="fg"><label class="fl">Importe ANUAL de pagas extra</label><input type="number" step="0.01" class="fi2" id="tPagasAnual" value="0"></div>
+      <div class="fg"><label class="fl">Nº de pagas/año (info)</label><input type="number" step="1" class="fi2" id="tNumPagas" value="2"></div>
+    </div>
+    <div class="warn">La base de Seguridad Social = devengos salariales del mes + prorrata de pagas (importe anual / 12). El plus de transporte no cotiza. El IRPF se aplica sobre los devengos del mes.</div>
+    <div class="ma">
+      <span id="tMsg" style="font-size:12px;color:var(--success);margin-right:auto;"></span>
+      <button class="btn btn-secondary" onclick="closeM('trModal')">Salir</button>
+      <button class="btn btn-primary" onclick="saveTrab()">Guardar trabajador</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyCVK3yF15Udps1l046kv6M1TASIwVEPcVs",authDomain:"duraspinvest.firebaseapp.com",projectId:"duraspinvest",storageBucket:"duraspinvest.firebasestorage.app",messagingSenderId:"280764832749",appId:"1:280764832749:web:a1fa6c44cf59518541a5e4"});
+const db=getFirestore(app);
+window.db=db;window.fsDoc=doc;window.fsSet=setDoc;window.fsDel=deleteDoc;window.fsColl=collection;
+window.WC=[];window.WE={};window.WT=[];
+onSnapshot(collection(db,"clients"),s=>{window.WC=s.docs.map(d=>({...d.data(),id:d.id})).filter(c=>(c.categoria||"despacho")!=="auxiliar");fillEmpresas();});
+onSnapshot(collection(db,"nom_empresas"),s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());window.WE=o;renderEmpForm();});
+onSnapshot(collection(db,"nom_trabajadores"),s=>{window.WT=s.docs.map(d=>({...d.data(),id:d.id}));renderTrab();fillNTrab();});
+window.fbSet=async(c,id,data)=>{try{await setDoc(doc(db,c,String(id)),data);}catch(e){console.error(e);alert("Error guardando: "+e.message);}};
+window.fbDel=async(c,id)=>{try{await deleteDoc(doc(db,c,String(id)));}catch(e){console.error(e);}};
+</script>
+<script>
+const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+// Tipos de cotización 2026 (%)
+const R={trabCC:4.70,trabDesInd:1.55,trabDesTemp:1.60,trabFP:0.10,trabMEI:0.15,
+         empCC:23.60,empDesInd:5.50,empDesTemp:6.70,empFP:0.60,empFOG:0.20,empMEI:0.75};
+const TOPE_MAX=4909.50; // base máxima mensual 2026 (ajustable)
+const num=v=>parseFloat(v)||0;
+const r2=v=>Math.round((v+Number.EPSILON)*100)/100;
+const eur=v=>(r2(v)).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+
+function showSec(id,btn){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");
+  if(id==="ss"||id==="nomina")fillMesSelects();}
+window.showSec=showSec;
+
+function opts(arr,val,sel){return "<option value=''>Seleccionar...</option>"+arr.map(a=>"<option value='"+a.id+"'"+(a.id===sel?" selected":"")+">"+(a.nombre||a.id)+"</option>").join("");}
+function fillEmpresas(){
+  const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  ["empSel","trFC","nEmp","sEmp","tEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
+    const todos=(id==="trFC");
+    s.innerHTML=(todos?"<option value=''>Todas</option>":"<option value=''>Seleccionar...</option>")+cs.map(c=>"<option value='"+c.id+"'>"+(c.nombre||c.id)+"</option>").join("");
+    s.value=cur;});
+}
+function fillMesSelects(){["nMes","sMes"].forEach(id=>{const s=document.getElementById(id);if(s&&!s.value)s.innerHTML=MESES.map((m,i)=>"<option value='"+(i+1)+"'"+(i===5?" selected":"")+">"+m+"</option>").join("");});}
+
+// ---------- EMPRESA ----------
+function renderEmpForm(){
+  const cid=document.getElementById("empSel").value, cont=document.getElementById("empForm");
+  if(!cid){cont.innerHTML="";return;}
+  const e=(window.WE||{})[cid]||{};
+  cont.innerHTML="<div class='mg2' style='max-width:640px;'>"+
+    "<div class='fg'><label class='fl'>CIF</label><input class='fi2' id='eCif' value='"+(e.cif||"")+"'></div>"+
+    "<div class='fg'><label class='fl'>CCC (cuenta de cotización)</label><input class='fi2' id='eCcc' value='"+(e.ccc||"")+"'></div>"+
+    "<div class='fg'><label class='fl'>Domicilio</label><input class='fi2' id='eDom' value='"+(e.domicilio||"")+"'></div>"+
+    "<div class='fg'><label class='fl'>CNAE / actividad</label><input class='fi2' id='eCnae' value='"+(e.cnae||"")+"'></div>"+
+    "<div class='fg'><label class='fl'>Convenio</label><input class='fi2' id='eConv' value='"+(e.convenio||"")+"'></div>"+
+    "<div class='fg'><label class='fl'>AT/EP · IT (%)</label><input type='number' step='0.01' class='fi2' id='eIT' value='"+(e.atepIT!=null?e.atepIT:"")+"' placeholder='p.ej. 0,80'></div>"+
+    "<div class='fg'><label class='fl'>AT/EP · IMS (%)</label><input type='number' step='0.01' class='fi2' id='eIMS' value='"+(e.atepIMS!=null?e.atepIMS:"")+"' placeholder='p.ej. 0,70'></div>"+
+    "</div>"+
+    "<div class='warn'>El AT/EP sale de la tarifa de primas según el CNAE (lo ves en tu RLC: «IT de accidentes» e «IMS de accidentes»). Para hostelería suele ser IT 0,80 + IMS 0,70.</div>"+
+    "<div style='margin-top:12px;'><button class='btn btn-primary' onclick='saveEmp()'>Guardar empresa</button></div>";
+}
+window.renderEmpForm=renderEmpForm;
+async function saveEmp(){
+  const cid=document.getElementById("empSel").value;if(!cid)return;
+  const cl=(window.WC||[]).find(c=>c.id===cid);
+  await fbSet("nom_empresas",cid,{id:cid,nombre:cl?cl.nombre:cid,
+    cif:val("eCif"),ccc:val("eCcc"),domicilio:val("eDom"),cnae:val("eCnae"),convenio:val("eConv"),
+    atepIT:num(val("eIT")),atepIMS:num(val("eIMS"))});
+  alert("Empresa guardada.");
+}
+window.saveEmp=saveEmp;
+const val=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
+
+// ---------- TRABAJADORES ----------
+function empNombre(id){const c=(window.WC||[]).find(x=>x.id===id);return c?c.nombre:id;}
+function renderTrab(){
+  const tb=document.getElementById("trBody");if(!tb)return;
+  const fc=document.getElementById("trFC").value;
+  const ts=(window.WT||[]).filter(t=>!fc||t.empresaId===fc).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  if(!ts.length){tb.innerHTML="<tr><td colspan='8'><div class='empty'>Sin trabajadores.</div></td></tr>";return;}
+  tb.innerHTML=ts.map(t=>"<tr><td style='font-weight:600;'>"+(t.nombre||"")+"</td><td style='font-size:12px;'>"+empNombre(t.empresaId)+"</td><td>"+(t.categoria||"")+"</td><td class='td-c'>"+(t.grupoCot||"")+"</td><td class='td-r'>"+eur(t.salarioBase)+"</td><td class='td-r'>"+eur(num(t.pagasAnual)/12)+"</td><td class='td-c'>"+(num(t.irpfPct)).toFixed(2)+"%</td><td class='td-r'><button class='btn btn-secondary btn-sm' onclick=\"openTrab('"+t.id+"')\">Editar</button> <button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"delTrab('"+t.id+"')\">✕</button></td></tr>").join("");
+}
+window.renderTrab=renderTrab;
+function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));s.innerHTML="<option value=''>Seleccionar...</option>"+cs.map(c=>"<option value='"+c.id+"'"+(c.id===sel?" selected":"")+">"+(c.nombre||c.id)+"</option>").join("");}
+function openTrab(id){
+  const t=id?(window.WT||[]).find(x=>x.id===id):null;
+  document.getElementById("trTitle").textContent=t?"Editar trabajador":"Nuevo trabajador";
+  document.getElementById("tId").value=t?t.id:"";
+  fillTEmp(t?t.empresaId:document.getElementById("trFC").value);
+  const set=(id2,v)=>{document.getElementById(id2).value=v;};
+  set("tNom",t?t.nombre||"":"");set("tDni",t?t.dni||"":"");set("tNaf",t?t.naf||"":"");
+  set("tCat",t?t.categoria||"":"");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");
+  document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
+  set("tJornada",t?t.jornadaPct||100:100);set("tIrpf",t?t.irpfPct||0:0);
+  set("tSalBase",t?t.salarioBase||0:0);set("tPlusConv",t?t.plusConvenio||0:0);set("tOtros",t?t.otrosSalariales||0:0);
+  set("tTransporte",t?t.plusTransporte||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);set("tNumPagas",t?t.numPagas||2:2);
+  document.getElementById("tMsg").textContent="";
+  document.getElementById("trModal").classList.add("open");
+}
+window.openTrab=openTrab;
+async function saveTrab(){
+  const emp=document.getElementById("tEmp").value, nom=val("tNom");
+  if(!emp||!nom){alert("Empresa y nombre son obligatorios.");return;}
+  const editando=!!document.getElementById("tId").value;
+  const id=document.getElementById("tId").value||("t"+Date.now());
+  await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:val("tDni"),naf:val("tNaf"),
+    categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),tipoContrato:document.getElementById("tContrato").value,
+    jornadaPct:num(val("tJornada"))||100,irpfPct:num(val("tIrpf")),
+    salarioBase:num(val("tSalBase")),plusConvenio:num(val("tPlusConv")),otrosSalariales:num(val("tOtros")),
+    plusTransporte:num(val("tTransporte")),pagasAnual:num(val("tPagasAnual")),numPagas:num(val("tNumPagas"))});
+  if(editando){closeM("trModal");return;}
+  ["tNom","tDni","tNaf","tCat","tSalBase","tPlusConv","tOtros","tTransporte","tPagasAnual"].forEach(x=>document.getElementById(x).value=(x==="tSalBase"||x==="tPlusConv"||x==="tOtros"||x==="tTransporte"||x==="tPagasAnual")?0:"");
+  document.getElementById("tId").value="";
+  const m=document.getElementById("tMsg");m.textContent="Guardado. Puedes añadir otro.";setTimeout(()=>{if(m)m.textContent="";},2500);
+}
+window.saveTrab=saveTrab;
+async function delTrab(id){if(!confirm("¿Eliminar este trabajador?"))return;await fbDel("nom_trabajadores",id);}
+window.delTrab=delTrab;
+function closeM(id){document.getElementById(id).classList.remove("open");}
+window.closeM=closeM;
+
+// ---------- MOTOR DE CÁLCULO ----------
+function calc(t,emp){
+  const jor=(num(t.jornadaPct)||100)/100;
+  const salariales=(num(t.salarioBase)+num(t.plusConvenio)+num(t.otrosSalariales));
+  const noSal=num(t.plusTransporte);
+  const devengo=r2(salariales+noSal);
+  const prorrata=num(t.pagasAnual)/12;
+  let baseCC=salariales+prorrata;
+  if(baseCC>TOPE_MAX)baseCC=TOPE_MAX;
+  baseCC=r2(baseCC);
+  const baseIRPF=r2(salariales+noSal);
+  const temp=t.tipoContrato==="temporal";
+  const cc=r2(baseCC*R.trabCC/100),des=r2(baseCC*(temp?R.trabDesTemp:R.trabDesInd)/100),fp=r2(baseCC*R.trabFP/100),mei=r2(baseCC*R.trabMEI/100);
+  const cotTrab=r2(cc+des+fp+mei);
+  const irpf=r2(baseIRPF*num(t.irpfPct)/100);
+  const deducir=r2(cotTrab+irpf);
+  const liquido=r2(devengo-deducir);
+  const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
+  const eCC=r2(baseCC*R.empCC/100),eDes=r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
+  const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
+  return {salariales:r2(salariales),noSal:r2(noSal),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
+}
+window.calc=calc;
+
+// ---------- NÓMINA UI ----------
+function fillNTrab(){
+  const emp=document.getElementById("nEmp").value, s=document.getElementById("nTrab");
+  const ts=(window.WT||[]).filter(t=>t.empresaId===emp).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  s.innerHTML="<option value=''>Seleccionar...</option>"+ts.map(t=>"<option value='"+t.id+"'>"+t.nombre+"</option>").join("");
+}
+window.fillNTrab=fillNTrab;
+function drow(lbl,val,cant){return "<tr class='rr'><td>"+lbl+"</td><td style='text-align:right;'>"+(cant||"")+"</td><td>"+val+"</td></tr>";}
+function calcNominaUI(){
+  const t=(window.WT||[]).find(x=>x.id===document.getElementById("nTrab").value);
+  const cont=document.getElementById("nRes");
+  if(!t){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
+  const emp=(window.WE||{})[t.empresaId]||{};
+  const mi=num(document.getElementById("nMes").value); const mes=MESES[mi-1]||"";
+  const dm=new Date(2026,mi,0).getDate();
+  const c=calc(t,emp);
+  const dev="<tr class='sec'><td colspan='3'>I. DEVENGOS</td></tr>"+
+    "<tr><td colspan='3' style='font-weight:600;'>1. Percepciones salariales</td></tr>"+
+    drow("Salario base","<b>"+eur(t.salarioBase)+"</b>")+
+    (num(t.plusConvenio)?drow("Plus convenio",eur(t.plusConvenio)):"")+
+    (num(t.otrosSalariales)?drow("Otros pluses salariales",eur(t.otrosSalariales)):"")+
+    (num(t.plusTransporte)?"<tr><td colspan='3' style='font-weight:600;'>2. Percepciones no salariales</td></tr>"+drow("Plus de transporte",eur(t.plusTransporte)):"")+
+    "<tr class='tt'><td colspan='2'>A. TOTAL DEVENGADO</td><td style='text-align:right;'>"+eur(c.devengo)+"</td></tr>";
+  const ded="<tr class='sec'><td colspan='3'>II. DEDUCCIONES</td></tr>"+
+    "<tr><td colspan='3' style='font-weight:600;'>1. Aportaciones del trabajador a la Seguridad Social</td></tr>"+
+    drow("Contingencias comunes","<span style='text-align:right;'>"+eur(c.cc)+"</span>","4,70%")+
+    drow("Desempleo",eur(c.des),(t.tipoContrato==="temporal"?"1,60":"1,55")+"%")+
+    drow("Formación profesional",eur(c.fp),"0,10%")+
+    drow("Mec. equidad intergen. (MEI)",eur(c.mei),"0,15%")+
+    "<tr class='tt'><td colspan='2'>Total aportaciones</td><td style='text-align:right;'>"+eur(c.cotTrab)+"</td></tr>"+
+    drow("2. Retención a cuenta del IRPF",eur(c.irpf),(num(t.irpfPct)).toFixed(2)+"%")+
+    "<tr class='tt'><td colspan='2'>B. TOTAL A DEDUCIR</td><td style='text-align:right;'>"+eur(c.deducir)+"</td></tr>";
+  const html="<div class='no-print' style='margin-bottom:10px;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF</button></div>"+
+   "<div id='printArea'><div class='nom'>"+
+    "<div class='hd'><div style='flex:1;'><div style='font-weight:700;font-size:13px;'>"+empNombre(t.empresaId)+"</div>"+
+      "<div>"+(emp.domicilio||"")+"</div><div>CIF: "+(emp.cif||"")+" &nbsp; CCC: "+(emp.ccc||"")+"</div></div>"+
+      "<div style='text-align:right;border-left:1px solid #333;'><div style='font-weight:700;'>Recibo de salarios</div><div>Periodo: 01 a "+dm+" de "+mes+" de 2026</div><div>Total días: "+dm+"</div></div></div>"+
+    "<table><tr><td style='width:50%;'><b>Trabajador/a:</b> "+t.nombre+"</td><td><b>NIF:</b> "+(t.dni||"")+"</td></tr>"+
+      "<tr><td><b>Nº afiliación SS:</b> "+(t.naf||"")+"</td><td><b>Categoría:</b> "+(t.categoria||"")+"</td></tr>"+
+      "<tr><td><b>Grupo cotización:</b> "+(t.grupoCot||"")+"</td><td><b>Antigüedad:</b> "+(t.antiguedad||"")+"</td></tr></table>"+
+    "<table>"+dev+ded+"</table>"+
+    "<table><tr class='tt'><td colspan='2' style='font-size:13px;'>LÍQUIDO TOTAL A PERCIBIR</td><td style='text-align:right;font-size:13px;'>"+eur(c.liquido)+"</td></tr></table>"+
+    "<table><tr class='sec'><td colspan='2'>DETERMINACIÓN DE LAS BASES DE COTIZACIÓN</td></tr>"+
+      "<tr><td>Base de contingencias comunes (incluye prorrata pagas "+eur(c.prorrata)+")</td><td style='text-align:right;'>"+eur(c.baseCC)+"</td></tr>"+
+      "<tr><td>Base de contingencias profesionales (AT/EP)</td><td style='text-align:right;'>"+eur(c.baseCC)+"</td></tr>"+
+      "<tr><td>Base sujeta a retención del IRPF</td><td style='text-align:right;'>"+eur(c.baseIRPF)+"</td></tr></table>"+
+    "<div style='display:flex;justify-content:space-between;padding:16px 10px 6px;font-size:11px;'><span>Firma y sello de la empresa</span><span>Recibí (firma del trabajador)</span></div>"+
+    "</div>"+
+    "<div style='max-width:720px;margin-top:10px;font-size:11px;color:var(--gray-400);' class='no-print'>Coste de Seguridad Social a cargo de la empresa: <b>"+eur(c.cotEmp)+"</b> (CC "+eur(c.eCC)+" · desempleo+FP+FOGASA "+eur(r2(c.eDes+c.eFP+c.eFOG))+" · AT/EP "+eur(c.eAT)+" · MEI "+eur(c.eMEI)+").</div>"+
+   "</div>"+
+   ((!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>Esta empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":"");
+  cont.innerHTML=html;
+}
+window.calcNominaUI=calcNominaUI;
+
+// ---------- SEGUROS SOCIALES (RLC) ----------
+function calcSS(){
+  const emp=document.getElementById("sEmp").value, cont=document.getElementById("sRes");
+  if(!emp){cont.innerHTML="<div class='warn'>Selecciona una empresa.</div>";return;}
+  const e=(window.WE||{})[emp]||{};
+  const ts=(window.WT||[]).filter(t=>t.empresaId===emp);
+  if(!ts.length){cont.innerHTML="<div class='warn'>Esta empresa no tiene trabajadores.</div>";return;}
+  const mes=MESES[num(document.getElementById("sMes").value)-1]||"";
+  let baseTotal=0, filas="";
+  ts.forEach(t=>{const c=calc(t,e);baseTotal+=c.baseCC;
+    filas+="<tr><td>"+t.nombre+"</td><td class='td-r'>"+eur(c.baseCC)+"</td><td class='td-r'>"+eur(c.cotTrab)+"</td><td class='td-r'>"+eur(c.cotEmp)+"</td></tr>";});
+  baseTotal=r2(baseTotal);
+  const it=num(e.atepIT),ims=num(e.atepIMS);
+  const cc=r2(baseTotal*(R.empCC+R.trabCC)/100);
+  const mei=r2(baseTotal*(R.empMEI+R.trabMEI)/100);
+  const atep=r2(baseTotal*(it+ims)/100);
+  // otras: desempleo (emp+trab) + FP (emp+trab) + FOGASA. Asumimos indefinido salvo temporales.
+  let otras=0; ts.forEach(t=>{const temp=t.tipoContrato==="temporal";const c=calc(t,e);
+    otras+=c.baseCC*((temp?R.empDesTemp:R.empDesInd)+(temp?R.trabDesTemp:R.trabDesInd)+R.empFP+R.trabFP+R.empFOG)/100;});
+  otras=r2(otras);
+  const total=r2(cc+mei+atep+otras);
+  cont.innerHTML="<div class='sub' style='margin-top:6px;'>"+empNombre(emp)+" · "+mes+" 2026 · "+ts.length+" trabajador(es)</div>"+
+   "<div class='tabla-wrapper' style='margin-bottom:14px;'><table><thead><tr><th>Trabajador</th><th class='td-r'>Base cotización</th><th class='td-r'>Cuota trabajador</th><th class='td-r'>Coste empresa</th></tr></thead><tbody>"+filas+
+   "<tr style='font-weight:700;border-top:2px solid var(--gray-200);'><td>TOTAL BASES</td><td class='td-r'>"+eur(baseTotal)+"</td><td></td><td></td></tr></tbody></table></div>"+
+   "<div class='recibo' style='max-width:520px;'>"+
+   "<div style='font-weight:700;'>Recibo de Liquidación (RLC) — a ingresar</div>"+
+   "<div class='rl'><span>Contingencias comunes (28,30%)</span><span>"+eur(cc)+"</span></div>"+
+   "<div class='rl'><span>MEI (0,90%)</span><span>"+eur(mei)+"</span></div>"+
+   "<div class='rl'><span>AT/EP ("+(it+ims).toFixed(2)+"%)</span><span>"+eur(atep)+"</span></div>"+
+   "<div class='rl'><span>Otras cotizaciones (desempleo+FP+FOGASA)</span><span>"+eur(otras)+"</span></div>"+
+   "<div class='rl tot' style='font-size:15px;'><span>TOTAL A INGRESAR</span><span>"+eur(total)+"</span></div>"+
+   "</div>"+
+   ((!it&&!ims)?"<div class='warn'>Falta configurar el AT/EP de esta empresa (en «Empresas»).</div>":"");
+}
+window.calcSS=calcSS;
+
+// init selects
+setTimeout(fillMesSelects,300);
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+</script>
+</body>
+</html>
