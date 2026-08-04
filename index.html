@@ -81,14 +81,26 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </style>
 </head>
 <body>
+<div id="loginScreen" style="position:fixed;inset:0;background:var(--navy);z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:330px;max-width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:700;color:var(--navy);font-size:16px;">Duraspinvest · Nóminas</div>
+    <div style="font-size:12px;color:var(--gray-400);margin:2px 0 16px;">Inicia sesión con tu cuenta</div>
+    <input type="email" id="loginEmail" placeholder="tu@email.com" style="width:100%;padding:9px 11px;border:1.5px solid #D6DEE8;border-radius:7px;margin-bottom:10px;font-size:13px;font-family:inherit;">
+    <input type="password" id="loginPassword" placeholder="contraseña" style="width:100%;padding:9px 11px;border:1.5px solid #D6DEE8;border-radius:7px;margin-bottom:8px;font-size:13px;font-family:inherit;">
+    <div id="loginError" style="color:#EF4444;font-size:12px;margin-bottom:8px;display:none;">Email o contraseña incorrectos</div>
+    <button onclick="doLogin()" style="width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:7px;font-weight:600;cursor:pointer;font-family:inherit;">Entrar</button>
+  </div>
+</div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.01b</div></div>
+  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.01c</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Tareas</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">IVA</a>
     <a class="cur">Nóminas</a>
   </div>
+  <span id="userBadge" style="color:var(--gold);font-size:11px;font-weight:600;margin-left:10px;"></span>
+  <button onclick="doLogout()" style="background:rgba(255,255,255,0.1);color:#a9b6cf;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;margin-left:8px;">Salir</button>
 </div>
 <nav>
   <button class="nav-btn active" onclick="showSec('empresas',this)">Empresas</button>
@@ -195,16 +207,33 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyCVK3yF15Udps1l046kv6M1TASIwVEPcVs",authDomain:"duraspinvest.firebaseapp.com",projectId:"duraspinvest",storageBucket:"duraspinvest.firebasestorage.app",messagingSenderId:"280764832749",appId:"1:280764832749:web:a1fa6c44cf59518541a5e4"});
-const db=getFirestore(app);
-window.db=db;window.fsDoc=doc;window.fsSet=setDoc;window.fsDel=deleteDoc;window.fsColl=collection;
+const db=getFirestore(app),auth=getAuth(app);
+window.db=db;window.auth=auth;window.fsSignIn=signInWithEmailAndPassword;window.fsSignOut=signOut;
+window.fsDoc=doc;window.fsSet=setDoc;window.fsDel=deleteDoc;window.fsColl=collection;
 window.WC=[];window.WE={};window.WT=[];
-onSnapshot(collection(db,"clients"),s=>{window.WC=s.docs.map(d=>({...d.data(),id:d.id})).filter(c=>(c.categoria||"despacho")!=="auxiliar");fillEmpresas();});
-onSnapshot(collection(db,"nom_empresas"),s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());window.WE=o;renderEmpForm();});
-onSnapshot(collection(db,"nom_trabajadores"),s=>{window.WT=s.docs.map(d=>({...d.data(),id:d.id}));renderTrab();fillNTrab();});
 window.fbSet=async(c,id,data)=>{try{await setDoc(doc(db,c,String(id)),data);}catch(e){console.error(e);alert("Error guardando: "+e.message);}};
 window.fbDel=async(c,id)=>{try{await deleteDoc(doc(db,c,String(id)));}catch(e){console.error(e);}};
+let ua,ub,uc;
+function act(){
+  ua=onSnapshot(collection(db,"clients"),s=>{window.WC=s.docs.map(d=>({...d.data(),id:d.id})).filter(c=>(c.categoria||"despacho")!=="auxiliar");fillEmpresas();},e=>console.error("clients",e));
+  ub=onSnapshot(collection(db,"nom_empresas"),s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());window.WE=o;renderEmpForm();});
+  uc=onSnapshot(collection(db,"nom_trabajadores"),s=>{window.WT=s.docs.map(d=>({...d.data(),id:d.id}));renderTrab();fillNTrab();});
+}
+function des(){[ua,ub,uc].forEach(u=>{if(u)u();});}
+onAuthStateChanged(auth,user=>{
+  if(user){
+    window.WC=[];window.WE={};window.WT=[];
+    document.getElementById("loginScreen").style.display="none";
+    const b=document.getElementById("userBadge");if(b)b.textContent=user.email.split("@")[0];
+    act();
+  }else{
+    des();
+    document.getElementById("loginScreen").style.display="flex";
+  }
+});
 </script>
 <script>
 const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -422,6 +451,15 @@ function calcSS(){
 }
 window.calcSS=calcSS;
 
+// login
+function doLogin(){
+  const e=(document.getElementById("loginEmail").value||"").trim(), p=document.getElementById("loginPassword").value;
+  document.getElementById("loginError").style.display="none";
+  window.fsSignIn(window.auth,e,p).catch(()=>{document.getElementById("loginError").style.display="block";});
+}
+function doLogout(){if(window.fsSignOut)window.fsSignOut(window.auth);}
+window.doLogin=doLogin;window.doLogout=doLogout;
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&document.getElementById("loginScreen").style.display!=="none")doLogin();});
 // init selects
 setTimeout(fillMesSelects,300);
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}
