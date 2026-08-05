@@ -93,7 +93,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.01c</div></div>
+  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.01d</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Tareas</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">IVA</a>
@@ -187,16 +187,18 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
       <div class="fg"><label class="fl">% de retención IRPF</label><input type="number" step="0.01" class="fi2" id="tIrpf" value="0"></div>
     </div>
-    <div style="font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;">Devengos mensuales</div>
+    <div style="font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;">Devengos y pagas</div>
     <div class="mg3">
-      <div class="fg"><label class="fl">Salario base</label><input type="number" step="0.01" class="fi2" id="tSalBase" value="0"></div>
-      <div class="fg"><label class="fl">Plus convenio</label><input type="number" step="0.01" class="fi2" id="tPlusConv" value="0"></div>
-      <div class="fg"><label class="fl">Otros pluses salariales</label><input type="number" step="0.01" class="fi2" id="tOtros" value="0"></div>
-      <div class="fg"><label class="fl">Plus transporte (no cotiza)</label><input type="number" step="0.01" class="fi2" id="tTransporte" value="0"></div>
+      <div class="fg"><label class="fl">Salario base mensual</label><input type="number" step="0.01" class="fi2" id="tSalBase" value="0"></div>
       <div class="fg"><label class="fl">Importe ANUAL de pagas extra</label><input type="number" step="0.01" class="fi2" id="tPagasAnual" value="0"></div>
-      <div class="fg"><label class="fl">Nº de pagas/año (info)</label><input type="number" step="1" class="fi2" id="tNumPagas" value="2"></div>
+      <div class="fg"><label class="fl">&nbsp;</label><label style="display:flex;align-items:center;gap:7px;font-size:13px;height:38px;"><input type="checkbox" id="tProrrateadas" style="width:16px;height:16px;"> Pagas prorrateadas</label></div>
     </div>
-    <div class="warn">La base de Seguridad Social = devengos salariales del mes + prorrata de pagas (importe anual / 12). El plus de transporte no cotiza. El IRPF se aplica sobre los devengos del mes.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;">
+      <span style="font-weight:600;color:var(--navy);font-size:13px;">Pluses (del convenio)</span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="addPlus()">+ Añadir plus</button>
+    </div>
+    <div id="tPluses"></div>
+    <div class="warn">Base de Seguridad Social = salario base + pluses que <b>cotizan</b> + prorrata de pagas (importe anual / 12). Si marcas <b>«Pagas prorrateadas»</b>, esa prorrata se paga también en la nómina del mes (si no, va aparte en las pagas). El IRPF se aplica sobre el salario base + pluses sujetos a IRPF (+ prorrata si va prorrateada).</div>
     <div class="ma">
       <span id="tMsg" style="font-size:12px;color:var(--success);margin-right:auto;"></span>
       <button class="btn btn-secondary" onclick="closeM('trModal')">Salir</button>
@@ -299,6 +301,25 @@ function renderTrab(){
 }
 window.renderTrab=renderTrab;
 function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));s.innerHTML="<option value=''>Seleccionar...</option>"+cs.map(c=>"<option value='"+c.id+"'"+(c.id===sel?" selected":"")+">"+(c.nombre||c.id)+"</option>").join("");}
+function capturePluses(){
+  window._pluses=[].map.call(document.querySelectorAll("#tPluses .plusrow"),row=>({
+    nombre:row.querySelector(".pn").value.trim(),importe:num(row.querySelector(".pi").value),
+    cotiza:row.querySelector(".pc").checked,irpf:row.querySelector(".pr").checked}));
+}
+function renderPluses(){
+  const c=document.getElementById("tPluses");if(!c)return;
+  const pl=window._pluses||[];
+  c.innerHTML=pl.length?pl.map((p,i)=>"<div class='plusrow' style='display:flex;gap:6px;align-items:center;margin-bottom:5px;'>"+
+    "<input class='pn fi2' style='flex:2;' placeholder='Concepto (p.ej. Plus convenio)' value=\""+(p.nombre||"").replace(/\"/g,'&quot;')+"\">"+
+    "<input class='pi fi2' style='flex:1;min-width:80px;' type='number' step='0.01' placeholder='€/mes' value='"+(p.importe!=null?p.importe:"")+"'>"+
+    "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pc' type='checkbox' "+(p.cotiza!==false?"checked":"")+"> cotiza</label>"+
+    "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pr' type='checkbox' "+(p.irpf!==false?"checked":"")+"> IRPF</label>"+
+    "<button type='button' class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick='removePlus("+i+")'>✕</button></div>").join(""):
+    "<div style='font-size:12px;color:var(--gray-400);'>Sin pluses. Usa «+ Añadir plus» para los que tenga el convenio.</div>";
+}
+function addPlus(){capturePluses();(window._pluses=window._pluses||[]).push({nombre:"",importe:0,cotiza:true,irpf:true});renderPluses();}
+function removePlus(i){capturePluses();window._pluses.splice(i,1);renderPluses();}
+window.addPlus=addPlus;window.removePlus=removePlus;
 function openTrab(id){
   const t=id?(window.WT||[]).find(x=>x.id===id):null;
   document.getElementById("trTitle").textContent=t?"Editar trabajador":"Nuevo trabajador";
@@ -309,8 +330,10 @@ function openTrab(id){
   set("tCat",t?t.categoria||"":"");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");
   document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
   set("tJornada",t?t.jornadaPct||100:100);set("tIrpf",t?t.irpfPct||0:0);
-  set("tSalBase",t?t.salarioBase||0:0);set("tPlusConv",t?t.plusConvenio||0:0);set("tOtros",t?t.otrosSalariales||0:0);
-  set("tTransporte",t?t.plusTransporte||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);set("tNumPagas",t?t.numPagas||2:2);
+  set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
+  document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
+  window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
+  renderPluses();
   document.getElementById("tMsg").textContent="";
   document.getElementById("trModal").classList.add("open");
 }
@@ -318,15 +341,18 @@ window.openTrab=openTrab;
 async function saveTrab(){
   const emp=document.getElementById("tEmp").value, nom=val("tNom");
   if(!emp||!nom){alert("Empresa y nombre son obligatorios.");return;}
+  capturePluses();
   const editando=!!document.getElementById("tId").value;
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:val("tDni"),naf:val("tNaf"),
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),tipoContrato:document.getElementById("tContrato").value,
     jornadaPct:num(val("tJornada"))||100,irpfPct:num(val("tIrpf")),
-    salarioBase:num(val("tSalBase")),plusConvenio:num(val("tPlusConv")),otrosSalariales:num(val("tOtros")),
-    plusTransporte:num(val("tTransporte")),pagasAnual:num(val("tPagasAnual")),numPagas:num(val("tNumPagas"))});
+    salarioBase:num(val("tSalBase")),pagasAnual:num(val("tPagasAnual")),
+    pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[]});
   if(editando){closeM("trModal");return;}
-  ["tNom","tDni","tNaf","tCat","tSalBase","tPlusConv","tOtros","tTransporte","tPagasAnual"].forEach(x=>document.getElementById(x).value=(x==="tSalBase"||x==="tPlusConv"||x==="tOtros"||x==="tTransporte"||x==="tPagasAnual")?0:"");
+  ["tNom","tDni","tNaf","tCat"].forEach(x=>document.getElementById(x).value="");
+  document.getElementById("tSalBase").value=0;document.getElementById("tPagasAnual").value=0;
+  window._pluses=[];renderPluses();
   document.getElementById("tId").value="";
   const m=document.getElementById("tMsg");m.textContent="Guardado. Puedes añadir otro.";setTimeout(()=>{if(m)m.textContent="";},2500);
 }
@@ -338,15 +364,18 @@ window.closeM=closeM;
 
 // ---------- MOTOR DE CÁLCULO ----------
 function calc(t,emp){
-  const jor=(num(t.jornadaPct)||100)/100;
-  const salariales=(num(t.salarioBase)+num(t.plusConvenio)+num(t.otrosSalariales));
-  const noSal=num(t.plusTransporte);
-  const devengo=r2(salariales+noSal);
+  const pl=Array.isArray(t.pluses)?t.pluses:[];
+  const sumP=f=>pl.filter(f).reduce((s,p)=>s+num(p.importe),0);
+  const salariales=num(t.salarioBase)+sumP(p=>p.cotiza!==false);   // cotizan
+  const noCotiza=sumP(p=>p.cotiza===false);                        // pluses que no cotizan (se pagan igual)
+  const irpfMens=num(t.salarioBase)+sumP(p=>p.irpf!==false);       // sujeto a IRPF
   const prorrata=num(t.pagasAnual)/12;
-  let baseCC=salariales+prorrata;
+  const prorra=t.pagasProrrateadas?prorrata:0;                     // prorrata pagada en el mes (si prorrateadas)
+  const devengo=r2(num(t.salarioBase)+pl.reduce((s,p)=>s+num(p.importe),0)+prorra); // total pagado el mes
+  let baseCC=salariales+prorrata;                                  // base SS: siempre incluye la prorrata
   if(baseCC>TOPE_MAX)baseCC=TOPE_MAX;
   baseCC=r2(baseCC);
-  const baseIRPF=r2(salariales+noSal);
+  const baseIRPF=r2(irpfMens+prorra);
   const temp=t.tipoContrato==="temporal";
   const cc=r2(baseCC*R.trabCC/100),des=r2(baseCC*(temp?R.trabDesTemp:R.trabDesInd)/100),fp=r2(baseCC*R.trabFP/100),mei=r2(baseCC*R.trabMEI/100);
   const cotTrab=r2(cc+des+fp+mei);
@@ -356,7 +385,7 @@ function calc(t,emp){
   const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
   const eCC=r2(baseCC*R.empCC/100),eDes=r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
   const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
-  return {salariales:r2(salariales),noSal:r2(noSal),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
+  return {salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
 }
 window.calc=calc;
 
@@ -376,12 +405,11 @@ function calcNominaUI(){
   const mi=num(document.getElementById("nMes").value); const mes=MESES[mi-1]||"";
   const dm=new Date(2026,mi,0).getDate();
   const c=calc(t,emp);
+  const pl=Array.isArray(t.pluses)?t.pluses:[];
   const dev="<tr class='sec'><td colspan='3'>I. DEVENGOS</td></tr>"+
-    "<tr><td colspan='3' style='font-weight:600;'>1. Percepciones salariales</td></tr>"+
     drow("Salario base","<b>"+eur(t.salarioBase)+"</b>")+
-    (num(t.plusConvenio)?drow("Plus convenio",eur(t.plusConvenio)):"")+
-    (num(t.otrosSalariales)?drow("Otros pluses salariales",eur(t.otrosSalariales)):"")+
-    (num(t.plusTransporte)?"<tr><td colspan='3' style='font-weight:600;'>2. Percepciones no salariales</td></tr>"+drow("Plus de transporte",eur(t.plusTransporte)):"")+
+    pl.map(p=>drow((p.nombre||"Plus")+(p.cotiza===false?" (no cotiza)":""),eur(p.importe))).join("")+
+    (c.prorra>0?drow("Prorrata pagas extras",eur(c.prorra)):"")+
     "<tr class='tt'><td colspan='2'>A. TOTAL DEVENGADO</td><td style='text-align:right;'>"+eur(c.devengo)+"</td></tr>";
   const ded="<tr class='sec'><td colspan='3'>II. DEDUCCIONES</td></tr>"+
     "<tr><td colspan='3' style='font-weight:600;'>1. Aportaciones del trabajador a la Seguridad Social</td></tr>"+
