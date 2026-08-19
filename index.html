@@ -102,7 +102,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.05a</div></div>
+  <div><div class="logo-name">Duraspinvest · Nóminas</div><div class="logo-sub">Nóminas y seguros sociales · v2026.08.19a</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Tareas</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">IVA</a>
@@ -116,6 +116,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
   <button class="nav-btn" onclick="showSec('trab',this)">Trabajadores</button>
   <button class="nav-btn" onclick="showSec('nomina',this)">Nómina</button>
   <button class="nav-btn" onclick="showSec('ss',this)">Seguros sociales</button>
+  <button class="nav-btn" onclick="showSec('finiquito',this)">Finiquito</button>
 </nav>
 <div class="wrap">
 
@@ -174,6 +175,33 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
         <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcSS()">Calcular</button></div>
       </div>
       <div id="sRes"></div>
+    </div>
+  </div>
+
+  <!-- FINIQUITO -->
+  <div id="finiquito" class="section">
+    <div class="card">
+      <h2>Finiquito (saldo y finiquito)</h2>
+      <div class="sub">Calcula el finiquito por baja: dias trabajados del mes, vacaciones devengadas y no disfrutadas, pagas pendientes e indemnizacion. Toma el salario de la ficha del trabajador.</div>
+      <div class="filtros">
+        <div class="fg"><span class="fl">Empresa</span><select class="fi" id="fEmp" onchange="fillFTrab()"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Trabajador</span><select class="fi" id="fTrab"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Fecha de baja</span><input type="date" class="fi" id="fBaja"></div>
+        <div class="fg"><span class="fl">Motivo</span><select class="fi" id="fMotivo">
+          <option value="voluntaria">Baja voluntaria</option>
+          <option value="fin_contrato">Fin de contrato temporal</option>
+          <option value="despido">Despido</option>
+          <option value="no_supera">No superar periodo de prueba</option></select></div>
+      </div>
+      <div class="filtros" style="margin-top:2px;">
+        <div class="fg"><span class="fl">Dias trabajados del mes de baja</span><input type="number" step="1" class="fi" id="fDiasMes" placeholder="auto" style="width:90px;"></div>
+        <div class="fg"><span class="fl">Vacaciones al ano (dias)</span><input type="number" step="1" class="fi" id="fVacAnio" value="30" style="width:90px;"></div>
+        <div class="fg"><span class="fl">Vacaciones ya disfrutadas (dias)</span><input type="number" step="0.01" class="fi" id="fVacDisf" value="0" style="width:90px;"></div>
+        <div class="fg"><span class="fl">Indemnizacion (EUR, opcional)</span><input type="number" step="0.01" class="fi" id="fIndem" placeholder="auto/0" style="width:110px;"></div>
+        <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcFiniquito()">Calcular finiquito</button></div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:2px;">Deja «dias trabajados del mes» vacio para que lo tome del dia de la fecha de baja; ponlo a <strong>0</strong> si ese mes ya se paga con una nomina normal aparte. Vacaciones: se devengan por ano natural (proporcional a los dias de alta) segun el convenio (hosteleria = 30 dias naturales).</div>
+      <div id="fRes" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -263,7 +291,7 @@ window.showSec=showSec;
 function opts(arr,val,sel){return "<option value=''>Seleccionar...</option>"+arr.map(a=>"<option value='"+a.id+"'"+(a.id===sel?" selected":"")+">"+(a.nombre||a.id)+"</option>").join("");}
 function fillEmpresas(){
   const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
-  ["empSel","trFC","nEmp","sEmp","tEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
+  ["empSel","trFC","nEmp","sEmp","tEmp","fEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
     const todos=(id==="trFC");
     s.innerHTML=(todos?"<option value=''>Todas</option>":"<option value=''>Seleccionar...</option>")+cs.map(c=>"<option value='"+c.id+"'>"+(c.nombre||c.id)+"</option>").join("");
     s.value=cur;});
@@ -496,6 +524,90 @@ function calcNominaUI(){
   cont.innerHTML=html;
 }
 window.calcNominaUI=calcNominaUI;
+
+// ---------- FINIQUITO ----------
+function fillFTrab(){
+  const emp=document.getElementById("fEmp").value, s=document.getElementById("fTrab");
+  const ts=(window.WT||[]).filter(t=>t.empresaId===emp).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  s.innerHTML="<option value=''>Seleccionar...</option>"+ts.map(t=>"<option value='"+t.id+"'>"+t.nombre+"</option>").join("");
+}
+window.fillFTrab=fillFTrab;
+function parseFecha(s){ // admite yyyy-mm-dd o dd/mm/yyyy
+  if(!s)return null; s=String(s).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m)return new Date(+m[3],+m[2]-1,+m[1]);
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+function diasEntre(a,b){return Math.round((b-a)/86400000)+1;} // inclusive
+function calcFiniquito(){
+  const t=(window.WT||[]).find(x=>x.id===document.getElementById("fTrab").value);
+  const cont=document.getElementById("fRes");
+  if(!t){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
+  const emp=(window.WE||{})[t.empresaId]||{};
+  const baja=parseFecha(document.getElementById("fBaja").value);
+  if(!baja){cont.innerHTML="<div class='warn'>Indica la fecha de baja.</div>";return;}
+  const alta=parseFecha(t.antiguedad)||new Date(baja.getFullYear(),0,1);
+  const motivo=document.getElementById("fMotivo").value;
+  const c=calc(t,emp);
+  const temp=t.tipoContrato==="temporal";
+  const valorDia=r2(c.devengo/30);                                    // salario/dia con prorrata de pagas
+  // dias trabajados del mes de baja (por defecto, del 1 al dia de la baja)
+  const diasMesRaw=document.getElementById("fDiasMes").value;
+  const diasMes=(diasMesRaw!==""&&diasMesRaw!=null)?num(diasMesRaw):baja.getDate();
+  const impDiasMes=r2(valorDia*diasMes);
+  // vacaciones devengadas en el ano natural de la baja (proporcional a dias de alta)
+  const vacAnio=num(document.getElementById("fVacAnio").value)||30;
+  const vacDisf=num(document.getElementById("fVacDisf").value);
+  const y=baja.getFullYear();
+  const iniDevengo=(alta>new Date(y,0,1))?alta:new Date(y,0,1);
+  const diasAlta=Math.max(0,diasEntre(iniDevengo,baja));
+  const diasAnio=diasEntre(new Date(y,0,1),new Date(y,11,31));
+  const vacDeveng=vacAnio*diasAlta/diasAnio;
+  const vacPend=Math.max(0,vacDeveng-vacDisf);
+  const impVac=r2(valorDia*vacPend);
+  // pagas extras pendientes (solo si NO estan prorrateadas)
+  const pagaExtra=t.pagasProrrateadas?0:r2(num(t.pagasAnual)*diasAlta/diasAnio);
+  // indemnizacion (exenta de IRPF y no cotiza dentro de limites)
+  const anosServicio=diasEntre(alta,baja)/365;
+  const indRaw=document.getElementById("fIndem").value;
+  let indem=0, indemNota="";
+  if(indRaw!==""&&indRaw!=null){indem=num(indRaw);indemNota="(introducida)";}
+  else if(motivo==="fin_contrato"){indem=r2(valorDia*12*anosServicio);indemNota="(12 dias por ano)";}
+  else if(motivo==="despido"){indem=0;indemNota="(ponla a mano en el campo)";}
+  // salarial sujeto a cotizacion e IRPF
+  const brutoSalarial=r2(impDiasMes+impVac+pagaExtra);
+  let baseCot=brutoSalarial; if(baseCot>TOPE_MAX)baseCot=TOPE_MAX;
+  const cCC=r2(baseCot*R.trabCC/100),cDes=r2(baseCot*(temp?R.trabDesTemp:R.trabDesInd)/100),cFP=r2(baseCot*R.trabFP/100),cMEI=r2(baseCot*R.trabMEI/100);
+  const cotTrab=r2(cCC+cDes+cFP+cMEI);
+  const irpf=r2(brutoSalarial*num(t.irpfPct)/100);
+  const totalDevengado=r2(brutoSalarial+indem);
+  const liquido=r2(totalDevengado-cotTrab-irpf);
+  const MOT={voluntaria:"Baja voluntaria",fin_contrato:"Fin de contrato temporal",despido:"Despido",no_supera:"No superar periodo de prueba"};
+  const fmt=d=>("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();
+  const rl=(l,v,extra)=>"<tr><td>"+l+(extra?" <span style='color:var(--gray-400);font-size:11px;'>"+extra+"</span>":"")+"</td><td style='text-align:right;'>"+eur(v)+"</td></tr>";
+  cont.innerHTML=
+    "<div class='no-print' style='margin-bottom:10px;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF</button></div>"+
+    "<div id='printArea'><div class='nom' style='max-width:640px;'>"+
+    "<div class='grid' style='border-bottom:1px solid #333;'>"+
+      "<div style='border-right:1px solid #333;'><div class='lbl'>Empresa</div><div style='padding:5px 8px;'><div style='font-weight:700;'>"+empNombre(t.empresaId)+"</div><div>C.I.F.: <b>"+(emp.cif||"")+"</b> · C.C.C.: <b>"+(emp.ccc||"")+"</b></div></div></div>"+
+      "<div><div class='lbl'>Trabajador/a</div><div style='padding:5px 8px;'><div style='font-weight:700;'>"+t.nombre+"</div><div>NIF: <b>"+(t.dni||"")+"</b></div><div>Alta: "+fmt(alta)+" · Baja: <b>"+fmt(baja)+"</b></div></div></div></div>"+
+    "<div style='padding:4px 10px;border-bottom:1px solid #333;background:#f7f9fc;font-size:10.5px;'>Recibo de saldo y finiquito · Motivo: <b>"+(MOT[motivo]||motivo)+"</b> · Antiguedad: "+anosServicio.toFixed(2)+" anos</div>"+
+    "<table><tr class='tt'><td>Concepto</td><td style='text-align:right;'>Importe</td></tr>"+
+      rl("Salario dias trabajados del mes de baja",impDiasMes,diasMes+" dias x "+eur(valorDia))+
+      rl("Vacaciones devengadas no disfrutadas",impVac,vacPend.toFixed(2)+" dias ("+vacDeveng.toFixed(2)+" deveng. - "+vacDisf+" disfr.)")+
+      (pagaExtra>0?rl("Parte proporcional pagas extras",pagaExtra,"no prorrateadas"):"")+
+      (indem>0?rl("Indemnizacion",indem,indemNota+" · exenta"):"")+
+      "<tr class='tt'><td>A. Total devengado</td><td style='text-align:right;'>"+eur(totalDevengado)+"</td></tr>"+
+      "<tr><td>Cotizacion S.Social (trabajador)</td><td style='text-align:right;'>&minus; "+eur(cotTrab)+"</td></tr>"+
+      "<tr><td style='padding-left:16px;color:var(--gray-600);font-size:11px;'>CC "+eur(cCC)+" · desempleo "+eur(cDes)+" · FP "+eur(cFP)+" · MEI "+eur(cMEI)+"</td><td></td></tr>"+
+      "<tr><td>Retencion IRPF ("+num(t.irpfPct).toFixed(2)+"%)</td><td style='text-align:right;'>&minus; "+eur(irpf)+"</td></tr>"+
+      "<tr class='tt'><td style='font-size:12px;'>LIQUIDO TOTAL A PERCIBIR</td><td style='text-align:right;font-size:12px;'>"+eur(liquido)+"</td></tr></table>"+
+    "<div style='padding:14px 10px 6px;font-size:10.5px;'>Recibido el saldo y finiquito por los conceptos indicados, la parte trabajadora declara extinguida la relacion laboral y saldadas cuantas cantidades pudieran adeudarse por dicha relacion.</div>"+
+    "<div style='display:flex;justify-content:space-between;padding:6px 10px 14px;font-size:10.5px;'><span>Firma y sello de la empresa</span><span>"+(emp.poblacion||"")+", "+fmt(baja)+"</span><span>Recibi (firma)</span></div>"+
+    "</div></div>"+
+    "<div style='font-size:11px;color:var(--gray-400);margin-top:8px;' class='no-print'>Base de cotizacion del finiquito: "+eur(baseCot)+". La indemnizacion (si la hay) va exenta de IRPF y no cotiza dentro de los limites legales; el resto (dias, vacaciones y pagas) cotiza y tributa. Si el mes de baja ya se paga con nomina aparte, pon «dias trabajados del mes» a 0.</div>";
+}
+window.calcFiniquito=calcFiniquito;
 
 // ---------- SEGUROS SOCIALES (RLC) ----------
 function calcSS(){
