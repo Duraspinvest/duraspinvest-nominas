@@ -158,6 +158,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
         <div class="fg"><span class="fl">Empresa</span><select class="fi" id="nEmp" onchange="fillNTrab()"><option value="">Seleccionar...</option></select></div>
         <div class="fg"><span class="fl">Trabajador</span><select class="fi" id="nTrab"><option value="">Seleccionar...</option></select></div>
         <div class="fg"><span class="fl">Mes</span><select class="fi" id="nMes"></select></div>
+        <div class="fg"><span class="fl">Horas del mes (t. parcial)</span><input class="fi" id="nHoras" type="number" step="0.5" placeholder="auto (L-V)" title="Si lo dejas vacío, la app calcula días laborables de lunes a viernes × horas diarias, sin restar festivos. Pon las horas reales del RNT si son otras." style="width:120px;"></div>
         <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcNominaUI()">Calcular</button></div>
       </div>
       <div id="nRes"></div>
@@ -279,9 +280,34 @@ const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","
 // Tipos de cotización 2026 (%)
 const R={trabCC:4.70,trabDesInd:1.55,trabDesTemp:1.60,trabFP:0.10,trabMEI:0.15,
          empCC:23.60,empDesInd:5.50,empDesTemp:6.70,empFP:0.60,empFOG:0.20,empMEI:0.75};
-const TOPE_MAX=4909.50; // base máxima mensual 2026 (ajustable)
+const TOPE_MAX=5101.20; // base máxima mensual 2026 (Orden PJC/297/2026)
+// Bases mínimas 2026 por grupo de cotización: mensual (jornada completa) y por hora (tiempo parcial)
+const BMIN_MES={1:1989.30,2:1649.70,3:1435.20}, BMIN_MES_RESTO=1424.40;
+const BMIN_HORA={1:11.98,2:9.94,3:8.65}, BMIN_HORA_RESTO=8.58;
+const ANIO=2026;
+// Días y horas del periodo: tiene en cuenta altas/bajas dentro del mes
+function periodoTrab(t,mi,horasOverride){
+  const dm=new Date(ANIO,mi,0).getDate();
+  let d1=1,d2=dm;
+  const fa=parseFecha(t.fechaAlta||t.antiguedad), fb=parseFecha(t.fechaBaja);
+  if(fa&&fa.getFullYear()===ANIO&&fa.getMonth()+1===mi)d1=fa.getDate();
+  if(fa&&(fa.getFullYear()>ANIO||(fa.getFullYear()===ANIO&&fa.getMonth()+1>mi)))return {d1:0,d2:0,dm,dias:0,diasNat:0,horas:0,completo:false};
+  if(fb&&fb.getFullYear()===ANIO&&fb.getMonth()+1===mi)d2=fb.getDate();
+  const diasNat=Math.max(0,d2-d1+1), completo=(d1===1&&d2===dm);
+  const dias=completo?30:Math.min(30,diasNat);           // mes comercial de 30 días
+  const jor=num(t.jornadaPct)||100;
+  let lab=0;for(let d=d1;d<=d2;d++){const w=new Date(ANIO,mi-1,d).getDay();if(w>0&&w<6)lab++;}
+  const horasAuto=r2(jor/100*40/5*lab);                   // estimación: días laborables L-V × horas diarias (sin festivos)
+  const horas=(horasOverride!=null&&horasOverride!=="")?num(horasOverride):horasAuto;
+  return {d1,d2,dm,dias,diasNat,horas,horasAuto,completo,parcial:jor<100};
+}
+function baseMinima(t,P){
+  const g=parseInt(t.grupoCot,10); if(!g)return 0;
+  if(P.parcial)return r2(P.horas*(BMIN_HORA[g]||BMIN_HORA_RESTO));
+  return r2((BMIN_MES[g]||BMIN_MES_RESTO)*P.dias/30);
+}
 const num=v=>parseFloat(v)||0;
-const r2=v=>Math.round((v+Number.EPSILON)*100)/100;
+const r2=v=>Math.round(+((+v||0)*100).toFixed(6))/100;
 const eur=v=>(r2(v)).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
 
 function showSec(id,btn){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");
@@ -400,16 +426,21 @@ function closeM(id){document.getElementById(id).classList.remove("open");}
 window.closeM=closeM;
 
 // ---------- MOTOR DE CÁLCULO ----------
-function calc(t,emp){
-  const pl=Array.isArray(t.pluses)?t.pluses:[];
-  const sumP=f=>pl.filter(f).reduce((s,p)=>s+num(p.importe),0);
-  const salariales=num(t.salarioBase)+sumP(p=>p.cotiza!==false);   // cotizan
-  const noCotiza=sumP(p=>p.cotiza===false);                        // pluses que no cotizan (se pagan igual)
-  const irpfMens=num(t.salarioBase)+sumP(p=>p.irpf!==false);       // sujeto a IRPF
-  const prorrata=num(t.pagasAnual)/12;
-  const prorra=t.pagasProrrateadas?prorrata:0;                     // prorrata pagada en el mes (si prorrateadas)
-  const devengo=r2(num(t.salarioBase)+pl.reduce((s,p)=>s+num(p.importe),0)+prorra); // total pagado el mes
-  let baseCC=salariales+prorrata;                                  // base SS: siempre incluye la prorrata
+function calc(t,emp,mi,horasOverride){
+  mi=mi||num((document.getElementById("nMes")||{}).value)||1;
+  const P=periodoTrab(t,mi,horasOverride), f=P.dias/30;
+  const pl=(Array.isArray(t.pluses)?t.pluses:[]).map(p=>({...p,importe:r2(num(p.importe)*f)}));
+  const salBase=r2(num(t.salarioBase)*f);
+  const sumP=g=>pl.filter(g).reduce((s,p)=>s+num(p.importe),0);
+  const salariales=salBase+sumP(p=>p.cotiza!==false);   // cotizan
+  const noCotiza=sumP(p=>p.cotiza===false);
+  const irpfMens=salBase+sumP(p=>p.irpf!==false);
+  const prorrata=r2(num(t.pagasAnual)/12*f);
+  const prorra=t.pagasProrrateadas?prorrata:0;
+  const devengo=r2(salBase+pl.reduce((s,p)=>s+num(p.importe),0)+prorra);
+  const baseReal=r2(salariales+prorrata);
+  const bmin=baseMinima(t,P);
+  let baseCC=Math.max(baseReal,bmin);
   if(baseCC>TOPE_MAX)baseCC=TOPE_MAX;
   baseCC=r2(baseCC);
   const baseIRPF=r2(irpfMens+prorra);
@@ -422,7 +453,7 @@ function calc(t,emp){
   const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
   const eCC=r2(baseCC*R.empCC/100),eDes=r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
   const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
-  return {salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
+  return {P,salBase,pl,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
 }
 window.calc=calc;
 
@@ -439,23 +470,24 @@ function pctES(v){return (Math.round(v*100)/100).toFixed(2).replace(".",",");}
 function calcNominaUI(){
   const v=document.getElementById("nTrab").value, cont=document.getElementById("nRes");
   const mi=num(document.getElementById("nMes").value);
+  const hv=(document.getElementById("nHoras")||{}).value; window._nHoras=(hv===""||hv==null||v==="__todos")?null:hv;
   let ts;
   if(v==="__todos"){const e=document.getElementById("nEmp").value;ts=(window.WT||[]).filter(t=>t.empresaId===e).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));}
   else{const t=(window.WT||[]).find(x=>x.id===v);ts=t?[t]:[];}
   if(!ts.length){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
   const partes=ts.map(t=>nominaHTML(t,mi));
-  const tot=ts.length>1?ts.reduce((a,t)=>{const c=calc(t,(window.WE||{})[t.empresaId]||{});a.dev+=c.devengo;a.liq+=c.liquido;a.ss+=c.cotTrab+c.cotEmp;a.irpf+=c.irpf;a.base+=c.baseCC;return a;},{dev:0,liq:0,ss:0,irpf:0,base:0}):null;
+  const tot=ts.length>1?ts.reduce((a,t)=>{const c=calc(t,(window.WE||{})[t.empresaId]||{},mi,window._nHoras);a.dev+=c.devengo;a.liq+=c.liquido;a.ss+=c.cotTrab+c.cotEmp;a.irpf+=c.irpf;a.base+=c.baseCC;return a;},{dev:0,liq:0,ss:0,irpf:0,base:0}):null;
   cont.innerHTML="<div class='no-print' style='margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF"+(ts.length>1?" ("+ts.length+" nóminas)":"")+"</button>"+
     (tot?"<span style='font-size:12px;color:#555;'>Total empresa: devengado <b>"+eur(tot.dev)+"</b> · líquido <b>"+eur(tot.liq)+"</b> · base cotización <b>"+eur(tot.base)+"</b> · seguros sociales <b>"+eur(tot.ss)+"</b> · IRPF <b>"+eur(tot.irpf)+"</b></span>":"")+"</div>"+
     "<div id='printArea'>"+partes.map((h,i)=>"<div class='nomPag' style='"+(i?"page-break-before:always;break-before:page;margin-top:24px;":"")+"'>"+h.nom+"</div>").join("")+"</div>"+
-    partes.map(h=>h.warn).filter(Boolean).slice(0,1).join("");
+    partes.map(h=>h.warn).filter(Boolean).join("");
 }
 function nominaHTML(t,mi){
   const emp=(window.WE||{})[t.empresaId]||{};
   const mes=MESES[mi-1]||"";
-  const dm=new Date(2026,mi,0).getDate();
-  const c=calc(t,emp);
-  const pl=Array.isArray(t.pluses)?t.pluses:[];
+  const c=calc(t,emp,mi,window._nHoras);
+  const P=c.P, dm=P.dm;
+  const pl=c.pl;
   const temp=t.tipoContrato==="temporal";
   const wDes=temp?R.trabDesTemp:R.trabDesInd, eDesR=temp?R.empDesTemp:R.empDesInd;
   const atep=num(emp.atepIT)+num(emp.atepIMS);
@@ -463,7 +495,7 @@ function nominaHTML(t,mi){
   const rline=(l,a)=>"<tr><td>"+l+"</td><td class='amt'>"+a+"</td></tr>";
   const pline=(l,p,a)=>"<tr><td>"+l+"</td><td class='pct'>"+p+"</td><td class='amt'>"+a+"</td></tr>";
   // ---- I. DEVENGOS ----
-  const devSal=rline("Salario base",eur(t.salarioBase))
+  const devSal=rline("Salario base"+(P.completo?"":" ("+P.dias+" días)"),eur(c.salBase))
      +salP.map(p=>rline(p.nombre||"Plus",eur(p.importe))).join("")
      +(c.prorra>0?rline("P.P. gratificaciones extraordinarias",eur(c.prorra)):"");
   const devNoSal=nosalP.length?nosalP.map(p=>rline(p.nombre||"Percepción",eur(p.importe))).join(""):"<tr><td colspan='2' style='color:#888;'>—</td></tr>";
@@ -491,6 +523,7 @@ function nominaHTML(t,mi){
     +"<tr><td colspan='2' class='subh'>1. Contingencias comunes</td><td class='empb' colspan='2'>APORTACIÓN EMPRESA</td></tr>"
     +"<tr><td>Remuneración mensual</td><td class='amt'>"+eur(c.salariales)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td>Prorrata pagas extraord.</td><td class='amt'>"+eur(c.prorrata)+"</td><td class='pct'></td><td class='amt'></td></tr>"
+    +(c.minAplicada?"<tr><td>Base mínima "+(P.parcial?"("+String(P.horas).replace(".",",")+" h × "+eur((BMIN_HORA[parseInt(t.grupoCot,10)]||BMIN_HORA_RESTO))+")":"grupo "+t.grupoCot)+"</td><td class='amt'>"+eur(c.bmin)+"</td><td class='pct'></td><td class='amt'></td></tr>":"")
     +"<tr><td>Base incapacidad temporal</td><td class='amt'>"+eur(c.baseCC)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td><b>Base de cotización a la S.Soc.</b></td><td class='amt'><b>"+eur(c.baseCC)+"</b></td><td class='pct'>"+pctES(R.empCC)+" %</td><td class='amt'>"+eur(c.eCC)+"</td></tr>"
     +"<tr><td style='padding-left:16px;'>Equidad intergeneracional</td><td class='amt'></td><td class='pct'>"+pctES(R.empMEI)+" %</td><td class='amt'>"+eur(c.eMEI)+"</td></tr></table>";
@@ -515,10 +548,10 @@ function nominaHTML(t,mi){
         "<div style='font-weight:700;'>"+t.nombre+"</div>"+
         "<div>NIF: <b>"+(t.dni||"")+"</b> &nbsp;·&nbsp; Nº afil. S.S.: <b>"+(t.naf||"")+"</b></div>"+
         "<div>Grupo profesional: "+(t.categoria||"—")+"</div>"+
-        "<div>Grupo cotización: <b>"+(t.grupoCot||"—")+"</b> &nbsp;·&nbsp; F. Antigüedad: "+(t.antiguedad||"—")+"</div></div></div></div>"+
+        "<div>Grupo cotización: <b>"+(t.grupoCot||"—")+"</b> &nbsp;·&nbsp; F. Antigüedad: "+(t.antiguedad?(()=>{const d=parseFecha(t.antiguedad);return d?String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear():t.antiguedad;})():"—")+"</div></div></div></div>"+
     // periodo
     "<div style='display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #333;background:#f7f9fc;font-size:10.5px;'>"+
-      "<span>Periodo de liquidación: del <b>01</b> al <b>"+dm+"</b> de "+mes+" de 2026</span><span>Total días: <b>"+dm+"</b></span></div>"+
+      "<span>Periodo de liquidación: del <b>"+String(P.d1).padStart(2,"0")+"</b> al <b>"+String(P.d2).padStart(2,"0")+"</b> de "+mes+" de 2026</span><span>Total días: <b>"+P.diasNat+"</b>"+(P.parcial?" &nbsp;·&nbsp; Horas: <b>"+String(P.horas).replace(".",",")+"</b>":"")+"</span></div>"+
     // devengos + deducciones
     "<div class='grid'>"+
       "<div style='border-right:1px solid #333;'><div class='lbl'>I. Devengos</div>"+devengos+"</div>"+
@@ -531,7 +564,10 @@ function nominaHTML(t,mi){
     "<div class='lbl' style='border-top:1px solid #333;'>Determinación de las bases de cotización a la S.S. y de la base sujeta a retención del I.R.P.F. — Aportación de la empresa</div>"+
     "<div class='grid'><div style='border-right:1px solid #333;'>"+baseCC1+"</div><div>"+baseCP+"</div></div>"+
     "</div>";
-  return {nom:html,warn:(!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>La empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":""};
+  let w=(!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>La empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":"";
+  if(!parseInt(t.grupoCot,10))w+="<div class='warn no-print'>"+t.nombre+": falta el grupo de cotización; sin él no se comprueba la base mínima.</div>";
+  if(c.minAplicada)w+="<div class='warn no-print' style='background:#FFF7E6;'>"+t.nombre+": la retribución ("+eur(c.baseReal)+") no llega a la base mínima de cotización ("+eur(c.bmin)+"), así que se cotiza por la mínima. Comprueba que las horas del mes ("+String(P.horas).replace(".",",")+") coinciden con las del RNT.</div>";
+  return {nom:html,warn:w};
 }
 window.calcNominaUI=calcNominaUI;
 
@@ -558,7 +594,7 @@ function calcFiniquito(){
   if(!baja){cont.innerHTML="<div class='warn'>Indica la fecha de baja.</div>";return;}
   const alta=parseFecha(t.antiguedad)||new Date(baja.getFullYear(),0,1);
   const motivo=document.getElementById("fMotivo").value;
-  const c=calc(t,emp);
+  const c=calc({...t,antiguedad:"",fechaAlta:"",fechaBaja:""},emp,1); // mes completo de referencia
   const temp=t.tipoContrato==="temporal";
   const valorDia=r2(c.devengo/30);                                    // salario/dia con prorrata de pagas
   // dias trabajados del mes de baja (por defecto, del 1 al dia de la baja)
@@ -628,7 +664,8 @@ function calcSS(){
   if(!ts.length){cont.innerHTML="<div class='warn'>Esta empresa no tiene trabajadores.</div>";return;}
   const mes=MESES[num(document.getElementById("sMes").value)-1]||"";
   let baseTotal=0, filas="";
-  ts.forEach(t=>{const c=calc(t,e);baseTotal+=c.baseCC;
+  const smi=num(document.getElementById("sMes").value)||1;
+  ts.forEach(t=>{const c=calc(t,e,smi);baseTotal+=c.baseCC;
     filas+="<tr><td>"+t.nombre+"</td><td class='td-r'>"+eur(c.baseCC)+"</td><td class='td-r'>"+eur(c.cotTrab)+"</td><td class='td-r'>"+eur(c.cotEmp)+"</td></tr>";});
   baseTotal=r2(baseTotal);
   const it=num(e.atepIT),ims=num(e.atepIMS);
@@ -636,7 +673,7 @@ function calcSS(){
   const mei=r2(baseTotal*(R.empMEI+R.trabMEI)/100);
   const atep=r2(baseTotal*(it+ims)/100);
   // otras: desempleo (emp+trab) + FP (emp+trab) + FOGASA. Asumimos indefinido salvo temporales.
-  let otras=0; ts.forEach(t=>{const temp=t.tipoContrato==="temporal";const c=calc(t,e);
+  let otras=0; ts.forEach(t=>{const temp=t.tipoContrato==="temporal";const c=calc(t,e,smi);
     otras+=c.baseCC*((temp?R.empDesTemp:R.empDesInd)+(temp?R.trabDesTemp:R.trabDesInd)+R.empFP+R.trabFP+R.empFOG)/100;});
   otras=r2(otras);
   const total=r2(cc+mei+atep+otras);
