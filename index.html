@@ -237,6 +237,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg"><label class="fl">Grupo de cotización (1-11)</label><input type="number" class="fi2" id="tGrupo" value="9"></div>
       <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
       <div class="fg"><label class="fl">Tipo de contrato</label><select class="fi2" id="tContrato"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option></select></div>
+      <div class="fg"><label class="fl">Tipo de perceptor</label><select class="fi2" id="tTipoPerc"><option value="trabajador">Trabajador (Régimen General)</option><option value="administrador">Administrador / consejero (sin Seg. Social en nómina)</option></select></div>
       <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
       <div class="fg"><label class="fl">% de retención IRPF</label><input type="number" step="0.01" class="fi2" id="tIrpf" value="0"></div>
     </div>
@@ -414,7 +415,7 @@ function openTrab(id){
   fillTEmp(t?t.empresaId:document.getElementById("trFC").value);
   const set=(id2,v)=>{document.getElementById(id2).value=v;};
   set("tNom",t?t.nombre||"":"");set("tDni",t?t.dni||"":"");set("tNaf",t?t.naf||"":"");
-  set("tCat",t?t.categoria||"":"");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");
+  set("tCat",t?t.categoria||"":"");set("tTipoPerc",t?t.tipoPerceptor||"trabajador":"trabajador");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");
   document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
   set("tJornada",t?t.jornadaPct||100:100);set("tIrpf",t?t.irpfPct||0:0);
   set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
@@ -435,7 +436,7 @@ async function saveTrab(){
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),tipoContrato:document.getElementById("tContrato").value,
     jornadaPct:num(val("tJornada"))||100,irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),pagasAnual:num(val("tPagasAnual")),
-    pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[]});
+    pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
   if(editando){closeM("trModal");return;}
   ["tNom","tDni","tNaf","tCat"].forEach(x=>document.getElementById(x).value="");
   document.getElementById("tSalBase").value=0;document.getElementById("tPagasAnual").value=0;
@@ -466,9 +467,11 @@ function calc(t,emp,mi,horasOverride){
   const prorra=t.pagasProrrateadas?prorrata:0;
   const devengo=r2(salBase+pl.reduce((s,p)=>s+num(p.importe),0)+prorra);
   const baseReal=r2(salariales+prorrata);
-  const bmin=baseMinima(t,P);
+  const admin=t.tipoPerceptor==="administrador";
+  const bmin=admin?0:baseMinima(t,P);
   let baseCC=Math.max(baseReal,bmin);
   if(baseCC>TOPE_MAX)baseCC=TOPE_MAX;
+  if(admin)baseCC=0;
   baseCC=r2(baseCC);
   const baseIRPF=r2(irpfMens+prorra);
   const temp=t.tipoContrato==="temporal";
@@ -596,7 +599,7 @@ function nominaHTML(t,mi){
     "<div class='grid'><div style='border-right:1px solid #333;'>"+baseCC1+"</div><div>"+baseCP+"</div></div>"+
     "</div>";
   let w=(!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>La empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":"";
-  if(!parseInt(t.grupoCot,10))w+="<div class='warn no-print'>"+t.nombre+": falta el grupo de cotización; sin él no se comprueba la base mínima.</div>";
+  if(!parseInt(t.grupoCot,10)&&t.tipoPerceptor!=="administrador")w+="<div class='warn no-print'>"+t.nombre+": falta el grupo de cotización; sin él no se comprueba la base mínima.</div>";
   if(c.minAplicada)w+="<div class='warn no-print' style='background:#FFF7E6;'>"+t.nombre+": la retribución ("+eur(c.baseReal)+") no llega a la base mínima de cotización ("+eur(c.bmin)+"), así que se cotiza por la mínima. Comprueba que las horas del mes ("+String(P.horas).replace(".",",")+") coinciden con las del RNT.</div>";
   return {nom:html,warn:w};
 }
@@ -781,7 +784,7 @@ function calcSS(){
   const emp=document.getElementById("sEmp").value, cont=document.getElementById("sRes");
   if(!emp){cont.innerHTML="<div class='warn'>Selecciona una empresa.</div>";return;}
   const e=(window.WE||{})[emp]||{};
-  const ts=(window.WT||[]).filter(t=>t.empresaId===emp);
+  const ts=(window.WT||[]).filter(t=>t.empresaId===emp&&t.tipoPerceptor!=="administrador");
   if(!ts.length){cont.innerHTML="<div class='warn'>Esta empresa no tiene trabajadores.</div>";return;}
   const mes=MESES[num(document.getElementById("sMes").value)-1]||"";
   let baseTotal=0, filas="";
