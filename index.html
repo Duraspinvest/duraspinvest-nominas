@@ -367,7 +367,9 @@ function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.
 function capturePluses(){
   window._pluses=[].map.call(document.querySelectorAll("#tPluses .plusrow"),row=>({
     nombre:row.querySelector(".pn").value.trim(),importe:num(row.querySelector(".pi").value),
-    cotiza:row.querySelector(".pc").checked,irpf:row.querySelector(".pr").checked}));
+    cotiza:row.querySelector(".pc").checked,irpf:row.querySelector(".pr").checked,
+    mes:num(row.querySelector(".pm").value)||"",l03:row.querySelector(".pl").checked,
+    baseL03:(row.querySelector(".pb").value===""?"":num(row.querySelector(".pb").value))}));
 }
 function renderPluses(){
   const c=document.getElementById("tPluses");if(!c)return;
@@ -377,6 +379,9 @@ function renderPluses(){
     "<input class='pi fi2' style='flex:1;min-width:80px;' type='number' step='0.01' placeholder='€/mes' value='"+(p.importe!=null?p.importe:"")+"'>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pc' type='checkbox' "+(p.cotiza!==false?"checked":"")+"> cotiza</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pr' type='checkbox' "+(p.irpf!==false?"checked":"")+"> IRPF</label>"+
+    "<select class='pm fi2' style='width:auto;font-size:11px;' title='Mes en que se paga (vacío = todos los meses)'><option value=''>Todos los meses</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(p.mes)===k+1?" selected":"")+">Solo "+m.toLowerCase()+"</option>").join("")+"</select>"+
+    "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;' title='Atrasos de meses anteriores: tributan IRPF este mes pero cotizan aparte en liquidación complementaria L03 (no suman a la base de este mes)'><input class='pl' type='checkbox' "+(p.l03?"checked":"")+"> atrasos (L03)</label>"+
+    "<input class='pb fi2' style='width:96px;font-size:11px;' type='number' step='0.01' title='Solo atrasos: suma de las bases que se cotizan en las L03, si no coincide con el importe de los atrasos (p. ej. porque algún mes ya cotizó por la base mínima). Vacío = igual al importe.' placeholder='base L03' value='"+(p.baseL03!=null?p.baseL03:"")+"'>"+
     "<button type='button' class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick='removePlus("+i+")'>✕</button></div>").join(""):
     "<div style='font-size:12px;color:var(--gray-400);'>Sin pluses. Usa «+ Añadir plus» para los que tenga el convenio.</div>";
 }
@@ -429,11 +434,14 @@ window.closeM=closeM;
 function calc(t,emp,mi,horasOverride){
   mi=mi||num((document.getElementById("nMes")||{}).value)||1;
   const P=periodoTrab(t,mi,horasOverride), f=P.dias/30;
-  const pl=(Array.isArray(t.pluses)?t.pluses:[]).map(p=>({...p,importe:r2(num(p.importe)*f)}));
+  const pl=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!num(p.mes)||num(p.mes)===mi)
+    .map(p=>({...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):r2(num(p.importe)*f)}));
   const salBase=r2(num(t.salarioBase)*f);
   const sumP=g=>pl.filter(g).reduce((s,p)=>s+num(p.importe),0);
-  const salariales=salBase+sumP(p=>p.cotiza!==false);   // cotizan
-  const noCotiza=sumP(p=>p.cotiza===false);
+  const salariales=salBase+sumP(p=>p.cotiza!==false&&!p.l03);   // cotizan este mes
+  const atrasosL03=r2(sumP(p=>p.l03));
+  const baseAtrL03=r2(pl.filter(p=>p.l03).reduce((a,p)=>a+(p.baseL03!==""&&p.baseL03!=null?num(p.baseL03):num(p.importe)),0));
+  const noCotiza=sumP(p=>p.cotiza===false&&!p.l03);
   const irpfMens=salBase+sumP(p=>p.irpf!==false);
   const prorrata=r2(num(t.pagasAnual)/12*f);
   const prorra=t.pagasProrrateadas?prorrata:0;
@@ -448,12 +456,14 @@ function calc(t,emp,mi,horasOverride){
   const cc=r2(baseCC*R.trabCC/100),des=r2(baseCC*(temp?R.trabDesTemp:R.trabDesInd)/100),fp=r2(baseCC*R.trabFP/100),mei=r2(baseCC*R.trabMEI/100);
   const cotTrab=r2(cc+des+fp+mei);
   const irpf=r2(baseIRPF*num(t.irpfPct)/100);
-  const deducir=r2(cotTrab+irpf);
+  const tTrab=R.trabCC+(temp?R.trabDesTemp:R.trabDesInd)+R.trabFP+R.trabMEI;
+  const cotAtr=r2(baseAtrL03*tTrab/100);                     // aportación del trabajador sobre atrasos (se ingresa en la L03)
+  const deducir=r2(cotTrab+cotAtr+irpf);
   const liquido=r2(devengo-deducir);
   const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
   const eCC=r2(baseCC*R.empCC/100),eDes=r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
   const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
-  return {P,salBase,pl,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
+  return {P,salBase,pl,atrasosL03,baseAtrL03,cotAtr,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
 }
 window.calc=calc;
 
@@ -491,7 +501,7 @@ function nominaHTML(t,mi){
   const temp=t.tipoContrato==="temporal";
   const wDes=temp?R.trabDesTemp:R.trabDesInd, eDesR=temp?R.empDesTemp:R.empDesInd;
   const atep=num(emp.atepIT)+num(emp.atepIMS);
-  const salP=pl.filter(p=>p.cotiza!==false), nosalP=pl.filter(p=>p.cotiza===false);
+  const salP=pl.filter(p=>p.cotiza!==false||p.l03), nosalP=pl.filter(p=>p.cotiza===false&&!p.l03);
   const rline=(l,a)=>"<tr><td>"+l+"</td><td class='amt'>"+a+"</td></tr>";
   const pline=(l,p,a)=>"<tr><td>"+l+"</td><td class='pct'>"+p+"</td><td class='amt'>"+a+"</td></tr>";
   // ---- I. DEVENGOS ----
@@ -511,7 +521,8 @@ function nominaHTML(t,mi){
     +pline("Desempleo",pctES(wDes),eur(c.des))
     +pline("Formación profesional",pctES(R.trabFP),eur(c.fp))
     +pline("Equidad intergeneracional (MEI)",pctES(R.trabMEI),eur(c.mei))
-    +"<tr class='tt'><td>TOTAL APORTACIONES</td><td></td><td class='amt'>"+eur(c.cotTrab)+"</td></tr>"
+    +(c.cotAtr?pline("Cotización atrasos (L03)",pctES(R.trabCC+wDes+R.trabFP+R.trabMEI),eur(c.cotAtr)):"")
+    +"<tr class='tt'><td>TOTAL APORTACIONES</td><td></td><td class='amt'>"+eur(r2(c.cotTrab+c.cotAtr))+"</td></tr>"
     +pline("2. I.R.P.F.",pctES(num(t.irpfPct)),eur(c.irpf))
     +"<tr><td>3. Anticipos</td><td></td><td class='amt'>—</td></tr>"
     +"<tr><td>4. Valor productos en especie</td><td></td><td class='amt'>—</td></tr>"
@@ -522,6 +533,7 @@ function nominaHTML(t,mi){
   const baseCC1="<table>"
     +"<tr><td colspan='2' class='subh'>1. Contingencias comunes</td><td class='empb' colspan='2'>APORTACIÓN EMPRESA</td></tr>"
     +"<tr><td>Remuneración mensual</td><td class='amt'>"+eur(c.salariales)+"</td><td class='pct'></td><td class='amt'></td></tr>"
+    +(c.atrasosL03?"<tr><td colspan='4' style='font-size:9.5px;color:#555;'>Atrasos ("+eur(c.atrasosL03)+") no incluidos: cotizan en las L03 de sus meses (bases L03: "+eur(c.baseAtrL03)+")</td></tr>":"")
     +"<tr><td>Prorrata pagas extraord.</td><td class='amt'>"+eur(c.prorrata)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +(c.minAplicada?"<tr><td>Base mínima "+(P.parcial?"("+String(P.horas).replace(".",",")+" h × "+eur((BMIN_HORA[parseInt(t.grupoCot,10)]||BMIN_HORA_RESTO))+")":"grupo "+t.grupoCot)+"</td><td class='amt'>"+eur(c.bmin)+"</td><td class='pct'></td><td class='amt'></td></tr>":"")
     +"<tr><td>Base incapacidad temporal</td><td class='amt'>"+eur(c.baseCC)+"</td><td class='pct'></td><td class='amt'></td></tr>"
