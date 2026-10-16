@@ -142,7 +142,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       </div>
       <div class="filtros" style="margin-top:8px;">
         <div class="fg"><span class="fl">Empresa</span>
-          <select class="fi" id="trFC" onchange="renderTrab()" style="min-width:260px;"><option value="">Todas</option></select></div>
+          <select class="fi" id="trFC" onchange="renderTrab()" style="min-width:260px;"><option value="">Selecciona una empresa…</option></select></div>
       </div>
       <div class="tabla-wrapper"><table><thead><tr><th>Trabajador</th><th>Empresa</th><th>Categoría</th><th class="td-c">Gr.cot</th><th class="td-r">Salario base</th><th class="td-r">Prorrata pagas</th><th class="td-c">% IRPF</th><th></th></tr></thead>
       <tbody id="trBody"><tr><td colspan="8"><div class="empty">Sin trabajadores.</div></td></tr></tbody></table></div>
@@ -311,14 +311,15 @@ const r2=v=>Math.round(+((+v||0)*100).toFixed(6))/100;
 const eur=v=>(r2(v)).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
 
 function showSec(id,btn){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");
-  if(id==="ss"||id==="nomina")fillMesSelects();}
+  if(id==="ss"||id==="nomina")fillMesSelects();
+  if(id==="trab"){const f=document.getElementById("trFC");if(f){f.value="";renderTrab();}}}
 window.showSec=showSec;
 
 function opts(arr,val,sel){return "<option value=''>Seleccionar...</option>"+arr.map(a=>"<option value='"+a.id+"'"+(a.id===sel?" selected":"")+">"+(a.nombre||a.id)+"</option>").join("");}
 function fillEmpresas(){
   const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   ["empSel","trFC","nEmp","sEmp","tEmp","fEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
-    const todos=(id==="trFC");
+    const todos=false;
     s.innerHTML=(todos?"<option value=''>Todas</option>":"<option value=''>Seleccionar...</option>")+cs.map(c=>"<option value='"+c.id+"'>"+(c.nombre||c.id)+"</option>").join("");
     s.value=cur;});
 }
@@ -358,7 +359,8 @@ function empNombre(id){const c=(window.WC||[]).find(x=>x.id===id);return c?c.nom
 function renderTrab(){
   const tb=document.getElementById("trBody");if(!tb)return;
   const fc=document.getElementById("trFC").value;
-  const ts=(window.WT||[]).filter(t=>!fc||t.empresaId===fc).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  if(!fc){tb.innerHTML="<tr><td colspan='8'><div class='empty'>Elige una empresa para ver sus trabajadores.</div></td></tr>";return;}
+  const ts=(window.WT||[]).filter(t=>t.empresaId===fc).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   if(!ts.length){tb.innerHTML="<tr><td colspan='8'><div class='empty'>Sin trabajadores.</div></td></tr>";return;}
   tb.innerHTML=ts.map(t=>"<tr><td style='font-weight:600;'>"+(t.nombre||"")+"</td><td style='font-size:12px;'>"+empNombre(t.empresaId)+"</td><td>"+(t.categoria||"")+"</td><td class='td-c'>"+(t.grupoCot||"")+"</td><td class='td-r'>"+eur(t.salarioBase)+"</td><td class='td-r'>"+eur(num(t.pagasAnual)/12)+"</td><td class='td-c'>"+(num(t.irpfPct)).toFixed(2)+"%</td><td class='td-r'><button class='btn btn-secondary btn-sm' onclick=\"openTrab('"+t.id+"')\">Editar</button> <button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"delTrab('"+t.id+"')\">✕</button></td></tr>").join("");
 }
@@ -374,8 +376,8 @@ function capturePluses(){
 function renderPluses(){
   const c=document.getElementById("tPluses");if(!c)return;
   const pl=window._pluses||[];
-  c.innerHTML=pl.length?pl.map((p,i)=>"<div class='plusrow' style='display:flex;gap:6px;align-items:center;margin-bottom:5px;'>"+
-    "<input class='pn fi2' style='flex:2;' placeholder='Concepto (p.ej. Plus convenio)' value=\""+(p.nombre||"").replace(/\"/g,'&quot;')+"\">"+
+  c.innerHTML=pl.length?pl.map((p,i)=>"<div class='plusrow' style='display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed #e5e7eb;'>"+
+    "<input class='pn fi2' style='flex:1 1 100%;' placeholder='Concepto (p.ej. Plus convenio)' value=\""+(p.nombre||"").replace(/\"/g,'&quot;')+"\">"+
     "<input class='pi fi2' style='flex:1;min-width:80px;' type='number' step='0.01' placeholder='€/mes' value='"+(p.importe!=null?p.importe:"")+"'>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pc' type='checkbox' "+(p.cotiza!==false?"checked":"")+"> cotiza</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pr' type='checkbox' "+(p.irpf!==false?"checked":"")+"> IRPF</label>"+
