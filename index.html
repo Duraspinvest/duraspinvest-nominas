@@ -117,6 +117,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
   <button class="nav-btn" onclick="showSec('nomina',this)">Nómina</button>
   <button class="nav-btn" onclick="showSec('ss',this)">Seguros sociales</button>
   <button class="nav-btn" onclick="showSec('finiquito',this)">Finiquito</button>
+  <button class="nav-btn" onclick="showSec('hist',this)">Historial</button>
 </nav>
 <div class="wrap">
 
@@ -162,6 +163,20 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
         <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcNominaUI()">Calcular</button></div>
       </div>
       <div id="nRes"></div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="hist" class="section">
+    <div class="card">
+      <h2>Historial de nóminas</h2>
+      <div class="sub">Nóminas cerradas de cada empresa: totales por mes, resumen del 111 por trimestre y del 190 por perceptor.</div>
+      <div class="filtros">
+        <div class="fg"><span class="fl">Empresa</span><select class="fi" id="hEmp" onchange="fillHist()"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Año</span><select class="fi" id="hAnio" onchange="fillHist()"></select></div>
+        <div class="fg"><span class="fl">&nbsp;</span><label class="btn btn-secondary" style="cursor:pointer;">Importar historial…<input type="file" accept=".json" style="display:none;" onchange="histImportar(this)"></label></div>
+      </div>
+      <div id="hRes"><div class="empty">Elige una empresa.</div></div>
     </div>
   </div>
 
@@ -256,13 +271,14 @@ window.fsDoc=doc;window.fsSet=setDoc;window.fsDel=deleteDoc;window.fsColl=collec
 window.WC=[];window.WE={};window.WT=[];
 window.fbSet=async(c,id,data)=>{try{await setDoc(doc(db,c,String(id)),data);}catch(e){console.error(e);alert("Error guardando: "+e.message);}};
 window.fbDel=async(c,id)=>{try{await deleteDoc(doc(db,c,String(id)));}catch(e){console.error(e);}};
-let ua,ub,uc;
+let ua,ub,uc,ud;window.WN=[];
 function act(){
   ua=onSnapshot(collection(db,"clients"),s=>{window.WC=s.docs.map(d=>({...d.data(),id:d.id})).filter(c=>(c.categoria||"despacho")!=="auxiliar");fillEmpresas();},e=>console.error("clients",e));
   ub=onSnapshot(collection(db,"nom_empresas"),s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());window.WE=o;renderEmpForm();});
   uc=onSnapshot(collection(db,"nom_trabajadores"),s=>{window.WT=s.docs.map(d=>({...d.data(),id:d.id}));renderTrab();fillNTrab();});
+  ud=onSnapshot(collection(db,"nom_nominas"),s=>{window.WN=s.docs.map(d=>({...d.data(),id:d.id}));if(document.getElementById("hist")&&document.getElementById("hist").classList.contains("active"))fillHist();},e=>console.error("nom_nominas",e));
 }
-function des(){[ua,ub,uc].forEach(u=>{if(u)u();});}
+function des(){[ua,ub,uc,ud].forEach(u=>{if(u)u();});}
 onAuthStateChanged(auth,user=>{
   if(user){
     window.WC=[];window.WE={};window.WT=[];
@@ -312,13 +328,14 @@ const eur=v=>(r2(v)).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFrac
 
 function showSec(id,btn){document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");
   if(id==="ss"||id==="nomina")fillMesSelects();
-  if(id==="trab"){const f=document.getElementById("trFC");if(f){f.value="";renderTrab();}}}
+  if(id==="trab"){const f=document.getElementById("trFC");if(f){f.value="";renderTrab();}}
+  if(id==="hist"){const f=document.getElementById("hEmp");if(f){f.value="";fillHist();}}}
 window.showSec=showSec;
 
 function opts(arr,val,sel){return "<option value=''>Seleccionar...</option>"+arr.map(a=>"<option value='"+a.id+"'"+(a.id===sel?" selected":"")+">"+(a.nombre||a.id)+"</option>").join("");}
 function fillEmpresas(){
   const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
-  ["empSel","trFC","nEmp","sEmp","tEmp","fEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
+  ["empSel","trFC","nEmp","sEmp","tEmp","fEmp","hEmp"].forEach(id=>{const s=document.getElementById(id);if(!s)return;const cur=s.value;
     const todos=false;
     s.innerHTML=(todos?"<option value=''>Todas</option>":"<option value=''>Seleccionar...</option>")+cs.map(c=>"<option value='"+c.id+"'>"+(c.nombre||c.id)+"</option>").join("");
     s.value=cur;});
@@ -491,7 +508,7 @@ function calcNominaUI(){
   const tot=ts.length>1?ts.reduce((a,t)=>{const c=calc(t,(window.WE||{})[t.empresaId]||{},mi,window._nHoras);a.dev+=c.devengo;a.liq+=c.liquido;a.ss+=c.cotTrab+c.cotEmp;a.irpf+=c.irpf;a.base+=c.baseCC;return a;},{dev:0,liq:0,ss:0,irpf:0,base:0}):null;
   cont.innerHTML="<div class='no-print' style='margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF"+(ts.length>1?" ("+ts.length+" nóminas)":"")+"</button>"+
     (tot?"<span style='font-size:12px;color:#555;'>Total empresa: devengado <b>"+eur(tot.dev)+"</b> · líquido <b>"+eur(tot.liq)+"</b> · base cotización <b>"+eur(tot.base)+"</b> · seguros sociales <b>"+eur(tot.ss)+"</b> · IRPF <b>"+eur(tot.irpf)+"</b></span>":"")+"</div>"+
-    "<div id='printArea'>"+partes.map((h,i)=>"<div class='nomPag' style='"+(i?"page-break-before:always;break-before:page;margin-top:24px;":"")+"'>"+h.nom+"</div>").join("")+"</div>"+
+    nomBarraCierre(ts,mi)+"<div id='printArea'>"+partes.map((h,i)=>"<div class='nomPag' style='"+(i?"page-break-before:always;break-before:page;margin-top:24px;":"")+"'>"+h.nom+"</div>").join("")+"</div>"+
     partes.map(h=>h.warn).filter(Boolean).join("");
 }
 function nominaHTML(t,mi){
@@ -584,6 +601,96 @@ function nominaHTML(t,mi){
   return {nom:html,warn:w};
 }
 window.calcNominaUI=calcNominaUI;
+// ===================== Cierre de mes e historial de nóminas =====================
+function nomId(empId,tId,anio,mes){return [empId,tId,anio,String(mes).padStart(2,"0")].join("_");}
+function nomGuardadas(empId,anio,mes){return (window.WN||[]).filter(n=>n.empresaId===empId&&n.anio===anio&&(mes==null||n.mes===mes));}
+function nomSnapshot(t,emp,mi,horas){
+  const c=calc(t,emp,mi,horas),h=nominaHTML(t,mi);
+  const conceptos=[{n:"Salario base",i:c.salBase,tipo:"sal"}].concat((c.pl||[]).map(p=>({n:p.nombre||"Plus",i:r2(num(p.importe)),tipo:p.l03?"atr":(p.cotiza===false?"nosal":"sal")})));
+  if(c.prorra)conceptos.push({n:"P.P. gratificaciones extraordinarias",i:c.prorra,tipo:"sal"});
+  return {id:nomId(t.empresaId,t.id,ANIO,mi),empresaId:t.empresaId,trabajadorId:t.id,nombre:t.nombre||"",dni:t.dni||"",naf:t.naf||"",
+    tipoPerceptor:t.tipoPerceptor||"trabajador",anio:ANIO,mes:mi,dias:c.P.diasNat,horas:c.P.parcial?c.P.horas:null,
+    conceptos,devengo:c.devengo,noCotiza:c.noCotiza,baseCC:c.baseCC,baseIRPF:c.baseIRPF,cotTrab:c.cotTrab,cotAtr:c.cotAtr||0,
+    irpfPct:num(t.irpfPct),irpf:c.irpf,liquido:c.liquido,cotEmp:c.cotEmp,atrasosL03:c.atrasosL03||0,baseAtrL03:c.baseAtrL03||0,
+    html:h.nom,origen:"app",cerrada:new Date().toISOString()};
+}
+function nomBarraCierre(ts,mi){
+  if(!ts.length)return "";
+  const empId=ts[0].empresaId;
+  const g=nomGuardadas(empId,ANIO,mi), ya=ts.filter(t=>g.some(n=>n.trabajadorId===t.id));
+  const mes=MESES[mi-1];
+  if(ya.length===ts.length){
+    const f=g.map(n=>n.cerrada).sort().pop();
+    return "<div class='no-print' style='margin:0 0 12px;padding:10px 14px;border-radius:8px;background:#ECFDF5;color:#065F46;font-size:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'>"+
+      "✔ "+mes+" cerrado"+(f?" el "+new Date(f).toLocaleDateString("es-ES"):"")+" ("+ya.length+" nómina"+(ya.length>1?"s":"")+" guardada"+(ya.length>1?"s":"")+"). Lo que ves es el cálculo actual; las guardadas están en Historial."+
+      "<button class='btn btn-secondary btn-sm' onclick='nomCerrar(true)'>Volver a cerrar (sustituir)</button></div>";
+  }
+  return "<div class='no-print' style='margin:0 0 12px;padding:10px 14px;border-radius:8px;background:#FFF7E6;color:#7C4A03;font-size:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'>"+
+    (ya.length?ya.length+" de "+ts.length+" ya guardadas. ":"")+"Cuando las nóminas de "+mes+" estén bien, ciérralo: quedan guardadas para el 111, el 190 y el historial."+
+    "<button class='btn btn-primary btn-sm' onclick='nomCerrar(false)'>Cerrar "+mes.toLowerCase()+" ("+ts.length+")</button></div>";
+}
+async function nomCerrar(sustituir){
+  const v=document.getElementById("nTrab").value, mi=num(document.getElementById("nMes").value), e=document.getElementById("nEmp").value;
+  const ts=v==="__todos"?(window.WT||[]).filter(t=>t.empresaId===e):(window.WT||[]).filter(t=>t.id===v);
+  if(!ts.length)return;
+  const emp=(window.WE||{})[e]||{};
+  if(sustituir&&!confirm("Se sustituirán las nóminas guardadas de "+MESES[mi-1]+" por el cálculo actual. ¿Seguir?"))return;
+  for(const t of ts){await fbSet("nom_nominas",nomId(t.empresaId,t.id,ANIO,mi),nomSnapshot(t,emp,mi,window._nHoras));}
+  setTimeout(calcNominaUI,300);
+}
+// ----- Historial -----
+function fillHist(){
+  const e=document.getElementById("hEmp").value, c=document.getElementById("hRes");
+  if(!e){c.innerHTML="<div class='empty'>Elige una empresa.</div>";return;}
+  const N=(window.WN||[]).filter(n=>n.empresaId===e);
+  const anios=[...new Set(N.map(n=>n.anio))].sort().reverse();
+  const sa=document.getElementById("hAnio");const cur=sa.value;
+  sa.innerHTML=(anios.length?anios:[ANIO]).map(a=>"<option"+(String(a)===cur?" selected":"")+">"+a+"</option>").join("");
+  const anio=num(sa.value)||ANIO, L=N.filter(n=>n.anio===anio);
+  if(!L.length){c.innerHTML="<div class='empty'>No hay nóminas guardadas de "+anio+". Ciérralas desde la pestaña Nómina o importa el historial.</div>";return;}
+  const tot=a=>a.reduce((s,n)=>({dev:s.dev+num(n.devengo),irpf:s.irpf+num(n.irpf),ss:s.ss+num(n.cotTrab)+num(n.cotAtr),liq:s.liq+num(n.liquido),base:s.base+num(n.baseCC),emp:s.emp+num(n.cotEmp)}),{dev:0,irpf:0,ss:0,liq:0,base:0,emp:0});
+  let h="<div style='font-weight:700;color:var(--navy);margin:6px 0;'>Meses cerrados</div><div class='tabla-wrapper'><table><thead><tr><th>Mes</th><th class='td-c'>Nóminas</th><th class='td-r'>Devengado</th><th class='td-r'>IRPF</th><th class='td-r'>SS trabajador</th><th class='td-r'>Líquido</th><th class='td-r'>Base cotización</th><th></th></tr></thead><tbody>";
+  for(let m=1;m<=12;m++){const a=L.filter(n=>n.mes===m);if(!a.length)continue;const t=tot(a);
+    h+="<tr style='cursor:pointer;' onclick='histMes("+m+")'><td>"+MESES[m-1]+"</td><td class='td-c'>"+a.length+"</td><td class='td-r'>"+eur(t.dev)+"</td><td class='td-r'>"+eur(t.irpf)+"</td><td class='td-r'>"+eur(t.ss)+"</td><td class='td-r'>"+eur(t.liq)+"</td><td class='td-r'>"+eur(t.base)+"</td><td class='td-r' style='color:var(--gray-400);'>ver ›</td></tr>";}
+  h+="</tbody></table></div><div id='hMes'></div>";
+  // Resumen 111 (rendimientos del trabajo) por trimestre
+  h+="<div style='font-weight:700;color:var(--navy);margin:18px 0 6px;'>Modelo 111 · rendimientos del trabajo</div><div class='tabla-wrapper'><table><thead><tr><th>Trimestre</th><th class='td-c'>Perceptores</th><th class='td-r'>Percepciones dinerarias</th><th class='td-r'>Retenciones</th></tr></thead><tbody>";
+  for(let q=1;q<=4;q++){const a=L.filter(n=>Math.ceil(n.mes/3)===q);if(!a.length)continue;const per=new Set(a.map(n=>n.dni||n.nombre)).size;
+    h+="<tr><td>"+q+"T</td><td class='td-c'>"+per+"</td><td class='td-r'>"+eur(a.reduce((s,n)=>s+num(n.devengo),0))+"</td><td class='td-r'>"+eur(a.reduce((s,n)=>s+num(n.irpf),0))+"</td></tr>";}
+  h+="</tbody></table></div><div style='font-size:11px;color:var(--gray-400);margin-top:4px;'>Las retribuciones de administradores se declaran en el 111 junto a las del trabajo (en el 190 van con su propia clave).</div>";
+  // Resumen anual por perceptor (190)
+  const P={};L.forEach(n=>{const k=n.dni||n.nombre;(P[k]=P[k]||{n:n.nombre,dni:n.dni,tipo:n.tipoPerceptor,dev:0,irpf:0,ss:0,meses:0});P[k].dev+=num(n.devengo);P[k].irpf+=num(n.irpf);P[k].ss+=num(n.cotTrab)+num(n.cotAtr);P[k].meses++;});
+  h+="<div style='font-weight:700;color:var(--navy);margin:18px 0 6px;'>Resumen anual por perceptor (base del 190)</div><div class='tabla-wrapper'><table><thead><tr><th>Perceptor</th><th>NIF</th><th>Clave</th><th class='td-c'>Meses</th><th class='td-r'>Percepciones</th><th class='td-r'>Retenciones</th><th class='td-r'>Gastos deducibles (SS)</th></tr></thead><tbody>"+
+    Object.values(P).sort((a,b)=>a.n.localeCompare(b.n)).map(p=>"<tr><td>"+p.n+"</td><td>"+(p.dni||"<span style='color:#B45309;'>falta</span>")+"</td><td>"+(p.tipo==="administrador"?"E · consejero/administrador":"A · trabajador")+"</td><td class='td-c'>"+p.meses+"</td><td class='td-r'>"+eur(p.dev)+"</td><td class='td-r'>"+eur(p.irpf)+"</td><td class='td-r'>"+eur(p.ss)+"</td></tr>").join("")+"</tbody></table></div>";
+  c.innerHTML=h;
+}
+function histMes(m){
+  const e=document.getElementById("hEmp").value, anio=num(document.getElementById("hAnio").value);
+  const a=(window.WN||[]).filter(n=>n.empresaId===e&&n.anio===anio&&n.mes===m).sort((x,y)=>x.nombre.localeCompare(y.nombre));
+  document.getElementById("hMes").innerHTML="<div style='margin:12px 0;padding:12px;border:1px solid var(--gray-200);border-radius:10px;'><div style='font-weight:700;margin-bottom:6px;'>"+MESES[m-1]+" "+anio+"</div><table style='width:100%;font-size:13px;'><tbody>"+
+    a.map(n=>"<tr><td>"+n.nombre+"</td><td class='td-r'>"+eur(n.devengo)+"</td><td class='td-r'>IRPF "+eur(n.irpf)+"</td><td class='td-r'>líquido "+eur(n.liquido)+"</td><td class='td-r'>"+
+      (n.html?"<button class='btn btn-secondary btn-sm' onclick=\"histVer('"+n.id+"')\">Ver / imprimir</button> ":"<span style='font-size:11px;color:var(--gray-400);'>importada</span> ")+
+      "<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"histBorrar('"+n.id+"')\">✕</button></td></tr>").join("")+"</tbody></table></div>";
+}
+function histVer(id){const n=(window.WN||[]).find(x=>x.id===id);if(!n||!n.html)return;
+  showSec("nomina");document.getElementById("nRes").innerHTML="<div class='no-print' style='margin-bottom:10px;display:flex;gap:10px;align-items:center;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF</button><span style='font-size:12px;color:var(--gray-400);'>Nómina guardada de "+MESES[n.mes-1]+" "+n.anio+" (cerrada el "+new Date(n.cerrada).toLocaleDateString("es-ES")+")</span></div><div id='printArea'>"+n.html+"</div>";}
+async function histBorrar(id){if(!confirm("¿Borrar esta nómina guardada? (podrás volver a cerrarla desde Nómina)"))return;await fbDel("nom_nominas",id);setTimeout(fillHist,300);}
+// Importar historial (JSON preparado por el despacho a partir de nóminas antiguas)
+async function histImportar(inp){
+  const e=document.getElementById("hEmp").value;if(!e){alert("Elige primero la empresa.");inp.value="";return;}
+  const f=inp.files[0];if(!f)return;let d;try{d=JSON.parse(await f.text());}catch(x){alert("El fichero no es válido.");return;}
+  const arr=Array.isArray(d)?d:(d.nominas||[]);let n=0;
+  const nd=s=>String(s||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  for(const x of arr){
+    const t=(window.WT||[]).find(t=>t.empresaId===e&&nd(t.dni)&&nd(t.dni)===nd(x.dni));
+    const tId=t?t.id:("x"+nd(x.dni||x.nombre));
+    const doc={...x,empresaId:e,trabajadorId:tId,id:nomId(e,tId,x.anio,x.mes),origen:"importada",cerrada:x.cerrada||new Date().toISOString()};
+    await fbSet("nom_nominas",doc.id,doc);n++;
+  }
+  inp.value="";alert(n+" nóminas importadas.");setTimeout(fillHist,500);
+}
+window.nomCerrar=nomCerrar;window.fillHist=fillHist;window.histMes=histMes;window.histVer=histVer;window.histBorrar=histBorrar;window.histImportar=histImportar;
+
 
 // ---------- FINIQUITO ----------
 function fillFTrab(){
