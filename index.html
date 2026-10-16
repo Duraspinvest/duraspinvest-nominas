@@ -430,17 +430,29 @@ window.calc=calc;
 function fillNTrab(){
   const emp=document.getElementById("nEmp").value, s=document.getElementById("nTrab");
   const ts=(window.WT||[]).filter(t=>t.empresaId===emp).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
-  s.innerHTML="<option value=''>Seleccionar...</option>"+ts.map(t=>"<option value='"+t.id+"'>"+t.nombre+"</option>").join("");
+  s.innerHTML="<option value=''>Seleccionar...</option>"+(ts.length>1?"<option value='__todos'>Todos ("+ts.length+")</option>":"")+ts.map(t=>"<option value='"+t.id+"'>"+t.nombre+"</option>").join("");
+  if(ts.length===1)s.value=ts[0].id;
 }
 window.fillNTrab=fillNTrab;
 function drow(lbl,val,cant){return "<tr class='rr'><td>"+lbl+"</td><td style='text-align:right;'>"+(cant||"")+"</td><td>"+val+"</td></tr>";}
 function pctES(v){return (Math.round(v*100)/100).toFixed(2).replace(".",",");}
 function calcNominaUI(){
-  const t=(window.WT||[]).find(x=>x.id===document.getElementById("nTrab").value);
-  const cont=document.getElementById("nRes");
-  if(!t){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
+  const v=document.getElementById("nTrab").value, cont=document.getElementById("nRes");
+  const mi=num(document.getElementById("nMes").value);
+  let ts;
+  if(v==="__todos"){const e=document.getElementById("nEmp").value;ts=(window.WT||[]).filter(t=>t.empresaId===e).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));}
+  else{const t=(window.WT||[]).find(x=>x.id===v);ts=t?[t]:[];}
+  if(!ts.length){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
+  const partes=ts.map(t=>nominaHTML(t,mi));
+  const tot=ts.length>1?ts.reduce((a,t)=>{const c=calc(t,(window.WE||{})[t.empresaId]||{});a.dev+=c.devengo;a.liq+=c.liquido;a.ss+=c.cotTrab+c.cotEmp;a.irpf+=c.irpf;a.base+=c.baseCC;return a;},{dev:0,liq:0,ss:0,irpf:0,base:0}):null;
+  cont.innerHTML="<div class='no-print' style='margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF"+(ts.length>1?" ("+ts.length+" nóminas)":"")+"</button>"+
+    (tot?"<span style='font-size:12px;color:#555;'>Total empresa: devengado <b>"+eur(tot.dev)+"</b> · líquido <b>"+eur(tot.liq)+"</b> · base cotización <b>"+eur(tot.base)+"</b> · seguros sociales <b>"+eur(tot.ss)+"</b> · IRPF <b>"+eur(tot.irpf)+"</b></span>":"")+"</div>"+
+    "<div id='printArea'>"+partes.map((h,i)=>"<div class='nomPag' style='"+(i?"page-break-before:always;break-before:page;margin-top:24px;":"")+"'>"+h.nom+"</div>").join("")+"</div>"+
+    partes.map(h=>h.warn).filter(Boolean).slice(0,1).join("");
+}
+function nominaHTML(t,mi){
   const emp=(window.WE||{})[t.empresaId]||{};
-  const mi=num(document.getElementById("nMes").value); const mes=MESES[mi-1]||"";
+  const mes=MESES[mi-1]||"";
   const dm=new Date(2026,mi,0).getDate();
   const c=calc(t,emp);
   const pl=Array.isArray(t.pluses)?t.pluses:[];
@@ -492,8 +504,7 @@ function calcNominaUI(){
     +"<tr><td>5. Base sujeta a retención del I.R.P.F.</td><td class='amt'>"+eur(c.baseIRPF)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td>6. Base I.R.P.F. retrib. en especie</td><td class='amt'>0,00</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td class='totbox' style='text-align:left;' colspan='2'>Total aportación empresarial</td><td class='totbox' colspan='2'>"+eur(c.cotEmp)+"</td></tr></table>";
-  const html="<div class='no-print' style='margin-bottom:10px;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF</button></div>"+
-   "<div id='printArea'><div class='nom'>"+
+  const html="<div class='nom'>"+
     // header empresa | trabajador
     "<div class='grid' style='border-bottom:1px solid #333;'>"+
      "<div style='border-right:1px solid #333;'><div class='lbl'>Empresa</div><div style='padding:5px 8px;'>"+
@@ -519,9 +530,8 @@ function calcNominaUI(){
     // determinación de bases
     "<div class='lbl' style='border-top:1px solid #333;'>Determinación de las bases de cotización a la S.S. y de la base sujeta a retención del I.R.P.F. — Aportación de la empresa</div>"+
     "<div class='grid'><div style='border-right:1px solid #333;'>"+baseCC1+"</div><div>"+baseCP+"</div></div>"+
-    "</div></div>"+
-   ((!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>Esta empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":"");
-  cont.innerHTML=html;
+    "</div>";
+  return {nom:html,warn:(!emp.atepIT&&!emp.atepIMS)?"<div class='warn no-print'>La empresa no tiene configurado el AT/EP. Ve a «Empresas» y ponlo (lo ves en tu RLC).</div>":""};
 }
 window.calcNominaUI=calcNominaUI;
 
