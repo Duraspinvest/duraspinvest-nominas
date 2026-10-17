@@ -201,7 +201,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="sub">Calcula el finiquito por baja: dias trabajados del mes, vacaciones devengadas y no disfrutadas, pagas pendientes e indemnizacion. Toma el salario de la ficha del trabajador.</div>
       <div class="filtros">
         <div class="fg"><span class="fl">Empresa</span><select class="fi" id="fEmp" onchange="fillFTrab()"><option value="">Seleccionar...</option></select></div>
-        <div class="fg"><span class="fl">Trabajador</span><select class="fi" id="fTrab"><option value="">Seleccionar...</option></select></div>
+        <div class="fg"><span class="fl">Trabajador</span><select class="fi" id="fTrab" onchange="{const t=(window.WT||[]).find(x=>x.id===this.value);if(t&&t.fechaBaja)document.getElementById('fBaja').value=t.fechaBaja;}"><option value="">Seleccionar...</option></select></div>
         <div class="fg"><span class="fl">Fecha de baja</span><input type="date" class="fi" id="fBaja"></div>
         <div class="fg"><span class="fl">Motivo</span><select class="fi" id="fMotivo">
           <option value="voluntaria">Baja voluntaria</option>
@@ -236,6 +236,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg"><label class="fl">Categoría / convenio</label><input class="fi2" id="tCat"></div>
       <div class="fg"><label class="fl">Grupo de cotización (1-11)</label><input type="number" class="fi2" id="tGrupo" value="9"></div>
       <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
+      <div class="fg"><label class="fl">Fecha de alta</label><input type="date" class="fi2" id="tAlta" title="Vacía = la de antigüedad. Si entra a mitad de mes, la nómina sale proporcional"></div>
+      <div class="fg"><label class="fl">Fecha de baja</label><input type="date" class="fi2" id="tBaja" title="Último día trabajado (despido, baja voluntaria, fin de contrato…). La nómina de ese mes sale proporcional y deja de salir en los meses siguientes"></div>
       <div class="fg"><label class="fl">Tipo de contrato</label><select class="fi2" id="tContrato"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option></select></div>
       <div class="fg"><label class="fl">Tipo de perceptor</label><select class="fi2" id="tTipoPerc"><option value="trabajador">Trabajador (Régimen General)</option><option value="administrador">Administrador / consejero (sin Seg. Social en nómina)</option></select></div>
       <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
@@ -309,6 +311,7 @@ function periodoTrab(t,mi,horasOverride){
   const fa=parseFecha(t.fechaAlta||t.antiguedad), fb=parseFecha(t.fechaBaja);
   if(fa&&fa.getFullYear()===ANIO&&fa.getMonth()+1===mi)d1=fa.getDate();
   if(fa&&(fa.getFullYear()>ANIO||(fa.getFullYear()===ANIO&&fa.getMonth()+1>mi)))return {d1:0,d2:0,dm,dias:0,diasNat:0,horas:0,completo:false};
+  if(fb&&(fb.getFullYear()<ANIO||(fb.getFullYear()===ANIO&&fb.getMonth()+1<mi)))return {d1:0,d2:0,dm,dias:0,diasNat:0,horas:0,completo:false};
   if(fb&&fb.getFullYear()===ANIO&&fb.getMonth()+1===mi)d2=fb.getDate();
   const diasNat=Math.max(0,d2-d1+1), completo=(d1===1&&d2===dm);
   const dias=completo?30:Math.min(30,diasNat);           // mes comercial de 30 días
@@ -380,7 +383,7 @@ function renderTrab(){
   if(!fc){tb.innerHTML="<tr><td colspan='8'><div class='empty'>Elige una empresa para ver sus trabajadores.</div></td></tr>";return;}
   const ts=(window.WT||[]).filter(t=>t.empresaId===fc).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   if(!ts.length){tb.innerHTML="<tr><td colspan='8'><div class='empty'>Sin trabajadores.</div></td></tr>";return;}
-  tb.innerHTML=ts.map(t=>"<tr><td style='font-weight:600;'>"+(t.nombre||"")+"</td><td style='font-size:12px;'>"+empNombre(t.empresaId)+"</td><td>"+(t.categoria||"")+"</td><td class='td-c'>"+(t.grupoCot||"")+"</td><td class='td-r'>"+eur(t.salarioBase)+"</td><td class='td-r'>"+eur(num(t.pagasAnual)/12)+"</td><td class='td-c'>"+(num(t.irpfPct)).toFixed(2)+"%</td><td class='td-r'><button class='btn btn-secondary btn-sm' onclick=\"openTrab('"+t.id+"')\">Editar</button> <button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"delTrab('"+t.id+"')\">✕</button></td></tr>").join("");
+  tb.innerHTML=ts.map(t=>"<tr"+(t.fechaBaja?" style='opacity:.6;'":"")+"><td style='font-weight:600;'>"+(t.nombre||"")+(t.fechaBaja?" <span style='font-size:10px;color:#B91C1C;font-weight:500;'>baja "+t.fechaBaja.split("-").reverse().join("/")+"</span>":"")+"</td><td style='font-size:12px;'>"+empNombre(t.empresaId)+"</td><td>"+(t.categoria||"")+"</td><td class='td-c'>"+(t.grupoCot||"")+"</td><td class='td-r'>"+eur(t.salarioBase)+"</td><td class='td-r'>"+eur(num(t.pagasAnual)/12)+"</td><td class='td-c'>"+(num(t.irpfPct)).toFixed(2)+"%</td><td class='td-r'><button class='btn btn-secondary btn-sm' onclick=\"openTrab('"+t.id+"')\">Editar</button> <button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"delTrab('"+t.id+"')\">✕</button></td></tr>").join("");
 }
 window.renderTrab=renderTrab;
 function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));s.innerHTML="<option value=''>Seleccionar...</option>"+cs.map(c=>"<option value='"+c.id+"'"+(c.id===sel?" selected":"")+">"+(c.nombre||c.id)+"</option>").join("");}
@@ -415,7 +418,7 @@ function openTrab(id){
   fillTEmp(t?t.empresaId:document.getElementById("trFC").value);
   const set=(id2,v)=>{document.getElementById(id2).value=v;};
   set("tNom",t?t.nombre||"":"");set("tDni",t?t.dni||"":"");set("tNaf",t?t.naf||"":"");
-  set("tCat",t?t.categoria||"":"");set("tTipoPerc",t?t.tipoPerceptor||"trabajador":"trabajador");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");
+  set("tCat",t?t.categoria||"":"");set("tTipoPerc",t?t.tipoPerceptor||"trabajador":"trabajador");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");set("tAlta",t?t.fechaAlta||"":"");set("tBaja",t?t.fechaBaja||"":"");
   document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
   set("tJornada",t?t.jornadaPct||100:100);set("tIrpf",t?t.irpfPct||0:0);
   set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
@@ -433,7 +436,7 @@ async function saveTrab(){
   const editando=!!document.getElementById("tId").value;
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:val("tDni"),naf:val("tNaf"),
-    categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),tipoContrato:document.getElementById("tContrato").value,
+    categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
     jornadaPct:num(val("tJornada"))||100,irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),pagasAnual:num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
@@ -504,7 +507,7 @@ function calcNominaUI(){
   const mi=num(document.getElementById("nMes").value);
   const hv=(document.getElementById("nHoras")||{}).value; window._nHoras=(hv===""||hv==null||v==="__todos")?null:hv;
   let ts;
-  if(v==="__todos"){const e=document.getElementById("nEmp").value;ts=(window.WT||[]).filter(t=>t.empresaId===e).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));}
+  if(v==="__todos"){const e=document.getElementById("nEmp").value;ts=(window.WT||[]).filter(t=>t.empresaId===e&&periodoTrab(t,mi).diasNat>0).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));}
   else{const t=(window.WT||[]).find(x=>x.id===v);ts=t?[t]:[];}
   if(!ts.length){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
   const partes=ts.map(t=>nominaHTML(t,mi));
