@@ -241,6 +241,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg"><label class="fl">Tipo de contrato</label><select class="fi2" id="tContrato"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option></select></div>
       <div class="fg"><label class="fl">Tipo de perceptor</label><select class="fi2" id="tTipoPerc"><option value="trabajador">Trabajador (Régimen General)</option><option value="administrador">Administrador / consejero (sin Seg. Social en nómina)</option></select></div>
       <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
+      <div class="fg"><label class="fl">Horas / semana</label><input type="number" step="0.5" class="fi2" id="tHorasSem" placeholder="auto (% × 40)" title="Vacío = % de jornada × 40 h"></div>
+      <div class="fg" style="grid-column:span 2;"><label class="fl">Días que trabaja</label><div id="tDias" style="display:flex;gap:4px;flex-wrap:wrap;padding-top:4px;"><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="1" style="width:auto;margin:0;">L</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="2" style="width:auto;margin:0;">M</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="3" style="width:auto;margin:0;">X</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="4" style="width:auto;margin:0;">J</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="5" style="width:auto;margin:0;">V</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="6" style="width:auto;margin:0;">S</label><label style="display:flex;align-items:center;gap:3px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 7px;cursor:pointer;"><input type="checkbox" value="0" style="width:auto;margin:0;">D</label></div></div>
       <div class="fg"><label class="fl">% de retención IRPF</label><input type="number" step="0.01" class="fi2" id="tIrpf" value="0"></div>
     </div>
     <div style="font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;">Devengos y pagas</div>
@@ -316,10 +318,12 @@ function periodoTrab(t,mi,horasOverride){
   const diasNat=Math.max(0,d2-d1+1), completo=(d1===1&&d2===dm);
   const dias=completo?30:Math.min(30,diasNat);           // mes comercial de 30 días
   const jor=num(t.jornadaPct)||100;
-  let lab=0;for(let d=d1;d<=d2;d++){const w=new Date(ANIO,mi-1,d).getDay();if(w>0&&w<6)lab++;}
-  const horasAuto=r2(jor/100*40/5*lab);                   // estimación: días laborables L-V × horas diarias (sin festivos)
+  const dsem=(Array.isArray(t.diasSemana)&&t.diasSemana.length)?t.diasSemana.map(Number):[1,2,3,4,5];
+  const hsem=num(t.horasSemana)||jor/100*40;
+  let lab=0;for(let d=d1;d<=d2;d++){const w=new Date(ANIO,mi-1,d).getDay();if(dsem.includes(w))lab++;}
+  const horasAuto=r2(hsem/dsem.length*lab);               // días que trabaja (según ficha) × horas diarias (sin festivos)
   const horas=(horasOverride!=null&&horasOverride!=="")?num(horasOverride):horasAuto;
-  return {d1,d2,dm,dias,diasNat,horas,horasAuto,completo,parcial:jor<100};
+  return {d1,d2,dm,dias,diasNat,horas,horasAuto,completo,parcial:jor<100,hsem,dsem};
 }
 function baseMinima(t,P){
   const g=parseInt(t.grupoCot,10); if(!g)return 0;
@@ -420,7 +424,8 @@ function openTrab(id){
   set("tNom",t?t.nombre||"":"");set("tDni",t?t.dni||"":"");set("tNaf",t?t.naf||"":"");
   set("tCat",t?t.categoria||"":"");set("tTipoPerc",t?t.tipoPerceptor||"trabajador":"trabajador");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");set("tAlta",t?t.fechaAlta||"":"");set("tBaja",t?t.fechaBaja||"":"");
   document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
-  set("tJornada",t?t.jornadaPct||100:100);set("tIrpf",t?t.irpfPct||0:0);
+  set("tJornada",t?t.jornadaPct||100:100);set("tHorasSem",t&&t.horasSemana?t.horasSemana:"");
+  {const ds=(t&&Array.isArray(t.diasSemana)&&t.diasSemana.length)?t.diasSemana.map(Number):[1,2,3,4,5];document.querySelectorAll("#tDias input").forEach(c=>c.checked=ds.includes(Number(c.value)));}set("tIrpf",t?t.irpfPct||0:0);
   set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
   document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
   window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
@@ -437,7 +442,7 @@ async function saveTrab(){
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:val("tDni"),naf:val("tNaf"),
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
-    jornadaPct:num(val("tJornada"))||100,irpfPct:num(val("tIrpf")),
+    jornadaPct:num(val("tJornada"))||100,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),pagasAnual:num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
   if(editando){closeM("trModal");return;}
@@ -585,6 +590,8 @@ function nominaHTML(t,mi){
         "<div style='font-weight:700;'>"+t.nombre+"</div>"+
         "<div>NIF: <b>"+(t.dni||"")+"</b> &nbsp;·&nbsp; Nº afil. S.S.: <b>"+(t.naf||"")+"</b></div>"+
         "<div>Grupo profesional: "+(t.categoria||"—")+"</div>"+
+        "<div>Jornada: "+(P.parcial?"<b>tiempo parcial "+String(r2(P.hsem)).replace(".",",")+" h/semana ("+String(num(t.jornadaPct)).replace(".",",")+" %)</b>":"completa ("+String(r2(P.hsem)).replace(".",",")+" h/semana)")+
+          ((P.dsem&&P.dsem.join()!=="1,2,3,4,5")?" · "+[1,2,3,4,5,6,0].filter(d=>P.dsem.includes(d)).map(d=>["D","L","M","X","J","V","S"][d]).join(", "):"")+"</div>"+
         "<div>Grupo cotización: <b>"+(t.grupoCot||"—")+"</b> &nbsp;·&nbsp; F. Antigüedad: "+(t.antiguedad?(()=>{const d=parseFecha(t.antiguedad);return d?String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear():t.antiguedad;})():"—")+"</div></div></div></div>"+
     // periodo
     "<div style='display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #333;background:#f7f9fc;font-size:10.5px;'>"+
@@ -596,7 +603,7 @@ function nominaHTML(t,mi){
     "</div>"+
     // firma
     "<div style='display:flex;justify-content:space-between;padding:14px 10px 8px;font-size:10.5px;border-top:1px solid #333;'>"+
-      "<span>Firma y sello de la empresa</span><span>"+(emp.poblacion||"")+" &nbsp; "+dm+" de "+mes+" de 2026</span><span>Recibí</span></div>"+
+      "<span>Firma y sello de la empresa</span><span>"+(emp.poblacion||"")+" &nbsp; "+(P.d2||dm)+" de "+mes+" de 2026</span><span>Recibí</span></div>"+
     // determinación de bases
     "<div class='lbl' style='border-top:1px solid #333;'>Determinación de las bases de cotización a la S.S. y de la base sujeta a retención del I.R.P.F. — Aportación de la empresa</div>"+
     "<div class='grid'><div style='border-right:1px solid #333;'>"+baseCC1+"</div><div>"+baseCP+"</div></div>"+
