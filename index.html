@@ -541,9 +541,35 @@ async function cvLeerIA(key){
   try{
     const tk=await window.auth.currentUser.getIdToken();
     const resp=await fetch(LEER_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tk},body:JSON.stringify({storagePath:d.path,tipo:"application/pdf",modo:"convenio",provincia:prov})});
-    const j=await resp.json();if(!j.ok||!j.datos||j.datos.raw)throw new Error(j.error||(j.datos&&j.datos.raw?"respuesta no válida":"sin datos"));
-    window._cvIA={datos:j.datos,key};cvIAPintar();
-  }catch(e){console.error(e);box.innerHTML="<div class='warn'>No se pudo leer: "+cvEsc(e.message)+". Si dice «Ruta no válida», falta desplegar la función nueva.</div>";}
+    let j;try{j=await resp.json();}catch(_){throw new Error("el servidor no respondió bien (HTTP "+resp.status+"); si tarda mucho, el documento puede ser demasiado largo");}
+    if(!j.ok||!j.datos)throw new Error(j.error||"sin datos");
+    let datos=j.datos;
+    if(datos.raw!==undefined){const r=cvJsonReparar(datos.raw);if(!r){window._cvIARaw=String(datos.raw||"");throw new Error("la IA devolvió un texto que no se puede interpretar");}datos=r;}
+    window._cvIA={datos,key};cvIAPintar();
+  }catch(e){console.error(e);const raw=window._cvIARaw;window._cvIARaw=null;
+    box.innerHTML="<div class='warn'>No se pudo leer: "+cvEsc(e.message)+". Si dice «Ruta no válida», falta desplegar la función nueva."+
+      (raw?"<details style='margin-top:6px;'><summary style='cursor:pointer;'>Ver lo que respondió la IA (cópialo a Claude si se repite)</summary><textarea readonly style='width:100%;height:160px;font-size:11px;margin-top:4px;'>"+cvEsc(raw.slice(0,6000))+"</textarea></details>":"")+"</div>";}
+}
+// Intenta recuperar el JSON de la IA: quita markdown/texto, comas sobrantes y, si vino cortado, cierra en el último elemento completo
+function cvJsonReparar(txt){
+  let t=String(txt||"").replace(/```json|```/g,"");const i0=t.indexOf("{");if(i0<0)return null;t=t.slice(i0);
+  const prueba=x=>{try{const o=JSON.parse(x);return o&&typeof o==="object"?o:null;}catch(_){return null;}};
+  const sinComas=x=>x.replace(/,\s*([}\]])/g,"$1");
+  let o=prueba(t)||prueba(sinComas(t));if(o)return o;
+  const i1=t.lastIndexOf("}");if(i1>0){o=prueba(sinComas(t.slice(0,i1+1)));if(o)return o;}
+  // cortado: recorrer guardando el último punto seguro
+  const st=[];let enStr=false,esc=false,seguro=null;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(enStr){if(esc)esc=false;else if(ch==="\\")esc=true;else if(ch==='"')enStr=false;continue;}
+    if(ch==='"'){enStr=true;continue;}
+    if(ch==="{"||ch==="["){st.push(ch==="{"?"}":"]");}
+    else if(ch==="}"||ch==="]"){st.pop();seguro={pos:i+1,st:st.slice()};if(!st.length)break;}
+    else if(ch===","){seguro={pos:i,st:st.slice()};}
+  }
+  if(!seguro)return null;
+  o=prueba(sinComas(t.slice(0,seguro.pos)+seguro.st.slice().reverse().join("")));
+  if(o){o._cortado=true;if(Array.isArray(o.tablas))o.tablas=o.tablas.filter(r=>r&&r.categoria&&r.importe!==undefined&&r.importe!=="");return o;}
+  return null;
 }
 function cvIAPintar(){
   const box=document.getElementById("cvIA");const x=(window._cvIA||{}).datos;if(!box||!x){if(box)box.innerHTML="";return;}
@@ -551,6 +577,7 @@ function cvIAPintar(){
   const pub=x.publicacion||{};
   box.innerHTML="<div style='border:2px solid #A7F3D0;background:#F0FDF4;border-radius:10px;padding:10px 12px;margin:8px 0;'>"+
     "<div style='font-weight:700;color:#065F46;margin-bottom:6px;'>Leído con IA ("+cvEsc(x.tipoDoc||"documento")+") — revisa antes de aplicar</div>"+
+    (x._cortado?"<div class='warn' style='margin-bottom:6px;'>⚠ La respuesta de la IA llegó incompleta (documento muy largo). Puede faltar el final de las tablas o las notas: compáralo con el PDF.</div>":"")+
     "<table style='font-size:12px;width:100%;'>"+fila("Nombre",x.nombre)+fila("Código",x.codigo)+fila("Ámbito",x.ambito)+fila("Vigencia",(x.vigDesde||"")+" – "+(x.vigHasta||""))+fila("Publicación",[pub.boletin,cvFecha(pub.fecha),pub.referencia].filter(Boolean).join(" · "))+
     fila("Pagas",(x.numPagas||"")+" × "+(x.diasPaga||"")+" días · "+(x.conceptoPagas||""))+
     ((x.pagas||[]).length?"<tr><td style='color:#555;'>Meses</td><td>"+(x.pagas||[]).map(p=>cvEsc(p.n)+" ("+(MESES[(num(p.mes)||1)-1]||"")+", devengo: "+cvEsc(p.devTexto||p.dev||"no consta")+")").join("; ")+"</td></tr>":"")+
