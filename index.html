@@ -476,10 +476,10 @@ function cvPintar(){
     "<input class='fi2 tn' style='flex:1;min-width:120px;' placeholder='Nota (provincia, jornada…)' value=\""+cvEsc(t.nota)+"\"><button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDelRow('tablas',"+i+")\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin tablas.</div>";
   (c.docs||[]).forEach((d,i)=>{if(!d.key)d.key=d.path||("ref"+i+"_"+Date.now());});
   const docs=(c.docs||[]).slice().sort((a,b)=>String(b.fechaPub||b.fecha).localeCompare(String(a.fechaPub||a.fecha))).map(d=>"<div style='display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed #e5e7eb;font-size:13px;'><span style='width:84px;color:#555;font-size:12px;'>"+cvFecha(d.fechaPub||d.fecha)+"</span><span style='flex:1;'>"+(d.path?"📄":"🔗")+" <b>"+cvEsc(d.desc||d.nombre)+"</b> <span style='color:#888;font-size:11px;'>"+(d.path?cvEsc(d.nombre)+(d.size?" · "+Math.round(d.size/1024)+" KB":""):"sin PDF")+"</span></span>"+
-    (d.url?"<a class='btn btn-secondary btn-sm' href='"+cvEsc(d.url)+"' target='_blank' rel='noopener'>Boletín</a>":"")+(d.path?"<button class='btn btn-secondary btn-sm' onclick=\"cvDocAbrir('"+cvEsc(d.path)+"')\">Abrir</button>":"")+"<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDocBorrar('"+cvEsc(d.key)+"')\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin documentos. Sube el PDF del convenio y de cada revisión.</div>";
+    (d.url?"<a class='btn btn-secondary btn-sm' href='"+cvEsc(d.url)+"' target='_blank' rel='noopener'>Boletín</a>":"")+(d.path?"<button class='btn btn-secondary btn-sm' onclick=\"cvDocAbrir('"+cvEsc(d.path)+"')\">Abrir</button><button class='btn btn-secondary btn-sm' style='color:#065F46;' title='Rellenar la ficha leyendo este PDF con IA' onclick=\"cvLeerIA('"+cvEsc(d.key)+"')\">Leer con IA</button>":"")+"<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDocBorrar('"+cvEsc(d.key)+"')\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin documentos. Sube el PDF del convenio y de cada revisión.</div>";
   const emp=[...new Set(Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.nombre||e.id).concat((window.WT||[]).filter(t=>t.convenioId===c.id).map(t=>((window.WE||{})[t.empresaId]||{}).nombre||t.empresaId)))];
   box.innerHTML="<div class='card' style='margin-top:14px;border:2px solid #C7D2FE;'>"+
-    "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'><h2 style='margin:0;'>"+(c.nombre?cvEsc(c.nombre):"Nuevo convenio")+"</h2><div style='display:flex;gap:6px;'><button class='btn btn-primary' onclick='cvGuardar()'>Guardar convenio</button><button class='btn btn-secondary' onclick='window._cv=null;cvPintar()'>Cerrar</button></div></div>"+
+    "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'><h2 style='margin:0;'>"+(c.nombre?cvEsc(c.nombre):"Nuevo convenio")+"</h2><div style='display:flex;gap:6px;'><button class='btn btn-primary' onclick='cvGuardar()'>Guardar convenio</button><button class='btn btn-secondary' onclick='window._cv=null;cvPintar()'>Cerrar</button><button class='btn btn-secondary' style='color:var(--danger);' onclick='cvEliminar()'>Eliminar convenio</button></div></div>"+
     (emp.length?"<div style='font-size:12px;color:#555;margin:4px 0 8px;'>Empresas con este convenio: <b>"+emp.map(cvEsc).join(", ")+"</b></div>":"<div style='font-size:12px;color:#888;margin:4px 0 8px;'>Ninguna empresa lo tiene asignado todavía (se asigna en Empresas).</div>")+
     "<div class='mg2'>"+inp("cvNom","Nombre",c.nombre,"text"," style='grid-column:1/-1;'")+inp("cvCod","Código de convenio",c.codigo)+inp("cvAmb","Ámbito",c.ambito)+inp("cvDes","Vigencia desde",c.vigDesde,"date")+inp("cvHas","Vigencia hasta (o prórroga)",c.vigHasta,"date")+
       "<div class='fg' style='grid-column:1/-1;'><label class='fl'>Enlace al boletín / REGCON</label><div style='display:flex;gap:6px;'><input class='fi2' id='cvBol' value=\""+cvEsc(c.boletin)+"\">"+(c.boletin?"<a class='btn btn-secondary btn-sm' href='"+cvEsc(c.boletin)+"' target='_blank' rel='noopener'>Abrir</a>":"")+"</div></div>"+
@@ -488,11 +488,19 @@ function cvPintar(){
     "<div class='mg2' style='max-width:420px;'>"+inp("cvNP","Nº de pagas",c.numPagas,"number")+inp("cvDP","Días por paga",c.diasPaga,"number")+"</div><div id='cvPag' style='margin-top:6px;'>"+pag+"</div>"+
 
     "<div style='display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;'><span style='font-weight:600;color:var(--navy);font-size:13px;'>Tablas salariales"+(anios.length?" ("+anios.join(", ")+")":"")+"</span><button class='btn btn-secondary btn-sm' onclick='cvAddTab()'>+ Fila</button></div><div id='cvTab'>"+tab+"</div>"+
-    "<div style='font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;'>Documentos (PDF del convenio, prórrogas, tablas)</div><div id='cvDocs'>"+docs+"</div>"+
+    "<div style='font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;'>Documentos (PDF del convenio, prórrogas, tablas)</div><div id='cvIA'></div><div id='cvDocs'>"+docs+"</div>"+
     "<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;'><input class='fi2' id='cvDocFecha' type='date' style='width:150px;' title='Fecha de publicación en el boletín'><input class='fi2' id='cvDocDesc' style='flex:2;min-width:200px;' placeholder='Descripción (p. ej. Prórroga y tablas 2025-2027 · DOGC)'><input class='fi2' id='cvDocUrl' style='flex:1;min-width:140px;' placeholder='Enlace al boletín (opcional)'><input type='file' id='cvDocFile' accept='.pdf,application/pdf,image/*'><button class='btn btn-primary btn-sm' onclick='cvDocSubir()'>Añadir</button><span id='cvDocMsg' style='font-size:12px;color:#555;'></span></div><div style='font-size:11px;color:#888;margin-top:2px;'>Fecha = publicación en el boletín. Sin archivo se guarda como referencia (p. ej. una revisión de la que aún no tienes el PDF).</div>"+
     "<div style='font-weight:600;color:var(--navy);margin:16px 0 6px;font-size:13px;'>Trabajadores vinculados (última tabla)</div>"+cvAfectadosHTML(c)+
     "</div>";
 }
+async function cvEliminar(){
+  const c=window._cv;if(!c)return;
+  const enUso=Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).length+(window.WT||[]).filter(t=>t.convenioId===c.id).length;
+  if(!confirm("¿Eliminar el convenio «"+(c.nombre||"sin nombre")+"»"+((c.docs||[]).some(d=>d.path)?" y sus documentos":"")+"? No se puede deshacer."+(enUso?"\n\nOjo: está asignado a "+enUso+" empresa(s)/trabajador(es); se quedarán sin convenio.":"")))return;
+  for(const d of (c.docs||[]))if(d.path){try{await window.stDelete(window.stRef(window.storage,d.path));}catch(e){console.warn(e);}}
+  await fbDel("nom_convenios",c.id);window.WCV=(window.WCV||[]).filter(x=>x.id!==c.id);window._cv=null;cvPintar();renderConvList();
+}
+window.cvEliminar=cvEliminar;
 async function cvGuardar(){const c=cvCapturar();if(!c.nombre){alert("Pon el nombre del convenio.");return;}c.act=new Date().toISOString();await fbSet("nom_convenios",c.id,c);alert("Convenio guardado.");}
 async function cvDocSubir(){
   const c=cvCapturar();const f=(document.getElementById("cvDocFile").files||[])[0];
@@ -523,6 +531,53 @@ function tCopiarPagasConv(){
   tSalUI();
 }
 Object.assign(window,{renderConvList,cvSeed,cvNuevo,cvAbrir,cvAddRev,cvAddTab,cvDelRow,cvPintar,cvGuardar,cvDocSubir,cvDocAbrir,cvDocBorrar,tCopiarPagasConv});
+
+// ---- Leer un PDF del convenio con IA (función leerDocumento, modo «convenio») ----
+const LEER_URL="https://leerdocumento-gyc3opqqlq-ew.a.run.app";
+async function cvLeerIA(key){
+  const c=cvCapturar();const d=(c.docs||[]).find(x=>x.key===key||x.path===key);if(!d||!d.path)return;
+  const prov=prompt("¿De qué provincia tomo la tabla salarial si el convenio trae varias?","Barcelona");if(prov===null)return;
+  const box=document.getElementById("cvIA");box.innerHTML="<div class='warn'>Leyendo «"+cvEsc(d.desc||d.nombre)+"» con IA… (un convenio largo puede tardar 1-2 minutos)</div>";
+  try{
+    const tk=await window.auth.currentUser.getIdToken();
+    const resp=await fetch(LEER_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tk},body:JSON.stringify({storagePath:d.path,tipo:"application/pdf",modo:"convenio",provincia:prov})});
+    const j=await resp.json();if(!j.ok||!j.datos||j.datos.raw)throw new Error(j.error||(j.datos&&j.datos.raw?"respuesta no válida":"sin datos"));
+    window._cvIA={datos:j.datos,key};cvIAPintar();
+  }catch(e){console.error(e);box.innerHTML="<div class='warn'>No se pudo leer: "+cvEsc(e.message)+". Si dice «Ruta no válida», falta desplegar la función nueva.</div>";}
+}
+function cvIAPintar(){
+  const box=document.getElementById("cvIA");const x=(window._cvIA||{}).datos;if(!box||!x){if(box)box.innerHTML="";return;}
+  const fila=(l,v)=>v||v===0?"<tr><td style='color:#555;width:140px;'>"+l+"</td><td>"+cvEsc(typeof v==="object"?JSON.stringify(v):v)+"</td></tr>":"";
+  const pub=x.publicacion||{};
+  box.innerHTML="<div style='border:2px solid #A7F3D0;background:#F0FDF4;border-radius:10px;padding:10px 12px;margin:8px 0;'>"+
+    "<div style='font-weight:700;color:#065F46;margin-bottom:6px;'>Leído con IA ("+cvEsc(x.tipoDoc||"documento")+") — revisa antes de aplicar</div>"+
+    "<table style='font-size:12px;width:100%;'>"+fila("Nombre",x.nombre)+fila("Código",x.codigo)+fila("Ámbito",x.ambito)+fila("Vigencia",(x.vigDesde||"")+" – "+(x.vigHasta||""))+fila("Publicación",[pub.boletin,cvFecha(pub.fecha),pub.referencia].filter(Boolean).join(" · "))+
+    fila("Pagas",(x.numPagas||"")+" × "+(x.diasPaga||"")+" días · "+(x.conceptoPagas||""))+
+    ((x.pagas||[]).length?"<tr><td style='color:#555;'>Meses</td><td>"+(x.pagas||[]).map(p=>cvEsc(p.n)+" ("+(MESES[(num(p.mes)||1)-1]||"")+", devengo: "+cvEsc(p.devTexto||p.dev||"no consta")+")").join("; ")+"</td></tr>":"")+
+    "<tr><td style='color:#555;'>Tablas</td><td>"+(x.tablas||[]).length+" filas"+((x.tablas||[]).length?" ("+[...new Set(x.tablas.map(t=>t.anio))].join(", ")+")":"")+"</td></tr>"+
+    ((x.pluses||[]).length?"<tr><td style='color:#555;'>Pluses</td><td>"+x.pluses.map(p=>cvEsc(p.nombre)+" "+cvEsc(p.importe)+" €/"+cvEsc(p.unidad||"")).join("; ")+"</td></tr>":"")+
+    fila("Notas",x.notas)+"</table>"+
+    "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;'><button class='btn btn-primary btn-sm' onclick='cvIAAplicar(false)'>Aplicar (solo campos vacíos + filas nuevas)</button><button class='btn btn-secondary btn-sm' onclick='cvIAAplicar(true)'>Aplicar sobrescribiendo</button><button class='btn btn-secondary btn-sm' onclick='window._cvIA=null;cvIAPintar()'>Descartar</button></div>"+
+    "<div style='font-size:11px;color:#555;margin-top:4px;'>Después revisa la ficha y pulsa «Guardar convenio». Comprueba siempre las cifras con el PDF.</div></div>";
+}
+function cvIAAplicar(sobre){
+  const c=cvCapturar();const x=(window._cvIA||{}).datos;if(!x)return;
+  const set=(k,v)=>{if(v===undefined||v===null||v===""||v===0)return;if(sobre||!c[k])c[k]=v;};
+  if(c.nombre==="(sin nombre)")c.nombre="";set("nombre",x.nombre);set("codigo",x.codigo);set("ambito",x.ambito);set("vigDesde",x.vigDesde);
+  if(x.vigHasta&&(sobre||!c.vigHasta||x.vigHasta>c.vigHasta))c.vigHasta=x.vigHasta;
+  set("numPagas",num(x.numPagas));set("diasPaga",num(x.diasPaga));
+  const devOk=["anioAnt","anio","m12","sem"];
+  if((x.pagas||[]).length&&(sobre||!(c.pagasCfg||[]).length))c.pagasCfg=x.pagas.filter(p=>num(p.mes)).map(p=>({n:p.n||"Paga extra",mes:num(p.mes),dev:devOk.includes(p.dev)?p.dev:"anio"}));
+  const ex=new Set((c.tablas||[]).map(t=>t.anio+"|"+t.categoria));
+  (x.tablas||[]).forEach(t=>{const k=num(t.anio)+"|"+t.categoria;if(t.categoria&&!ex.has(k)){(c.tablas=c.tablas||[]).push({anio:num(t.anio),categoria:String(t.categoria),importe:num(t.importe),unidad:["mes","dia","anio","hora"].includes(t.unidad)?t.unidad:"mes",nota:t.nota||""});ex.add(k);}});
+  const extra=[x.conceptoPagas?"Pagas: "+x.conceptoPagas+((x.pagas||[]).some(p=>!p.dev)?" (devengo no fijado en el convenio)":""):"",(x.pluses||[]).length?"Pluses: "+x.pluses.map(p=>p.nombre+" "+p.importe+" €/"+(p.unidad||"")).join("; "):"",x.notas||""].filter(Boolean).join("\n");
+  if(extra&&!String(c.notas||"").includes(String(x.notas||"").slice(0,40)))c.notas=(c.notas?c.notas+"\n\n":"")+"[IA "+new Date().toLocaleDateString("es-ES")+"] "+extra;
+  const d=(c.docs||[]).find(y=>y.key===window._cvIA.key||y.path===window._cvIA.key);const pub=x.publicacion||{};
+  if(d){if(pub.fecha&&!d.fechaPub)d.fechaPub=pub.fecha;if(!d.desc&&(pub.boletin||pub.referencia))d.desc=[x.tipoDoc==="revision"?"Revisión":"Convenio",pub.referencia,pub.boletin].filter(Boolean).join(" · ");}
+  window._cvIA=null;cvPintar();
+  const b=document.getElementById("cvIA");if(b)b.innerHTML="<div class='warn'>Aplicado. Revisa los datos y pulsa «Guardar convenio».</div>";
+}
+Object.assign(window,{cvLeerIA,cvIAAplicar,cvIAPintar});
 
 // ---- Categoría del convenio en el trabajador ----
 function cvDeEmpresa(empId,cvId){const e=(window.WE||{})[empId]||{};const id=cvId||e.convenioId;return (window.WCV||[]).find(x=>x.id===id)||null;}
