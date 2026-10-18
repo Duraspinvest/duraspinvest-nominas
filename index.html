@@ -102,7 +102,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.08.20a</div></div>
+  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18-sectores</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Despacho</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">Fiscal</a>
@@ -685,6 +685,10 @@ function tCvCatFill(){
   s.innerHTML="<option value=''>"+(c?"— sin vincular —":"(la empresa no tiene convenio con tablas)")+"</option>"+
     (secs.length>1||secs[0]?secs.map(se=>"<optgroup label=\""+cvEsc(se||"Sin sector")+"\">"+uniq(filas.filter(t=>(t.sector||"")===se)).map(opt).join("")+"</optgroup>").join(""):uniq(filas).map(opt).join(""));
   if(cur&&!cats.includes(cur))s.innerHTML+="<option selected>"+cvEsc(cur)+"</option>";
+  {let dg=document.getElementById("tCvDiag");if(!dg){dg=document.createElement("div");dg.id="tCvDiag";dg.style.cssText="font-size:11px;color:#6B7280;margin-top:2px;";s.parentNode.insertBefore(dg,s.nextSibling);}
+   const nS=Object.keys(ultSec).filter(Boolean),dup=c?(window.WCV||[]).filter(x=>x.id!==c.id&&String(x.nombre||"").trim().toLowerCase()===String(c.nombre||"").trim().toLowerCase()).length:0;
+   dg.innerHTML=c?"Usando: <b>"+cvEsc(c.nombre)+"</b> · "+T.length+" filas · "+(nS.length?nS.length+" sectores ("+nS.map(k=>cvEsc(k)+" "+ultSec[k]).join(", ")+")":"sin sectores")+(ultSec[""]?" · "+T.filter(t=>!t.sector).length+" filas sin sector":"")+
+     (dup?" <span style='color:#B45309;font-weight:600;'>⚠ hay "+(dup+1)+" fichas de convenio con este nombre: revisa cuál tiene asignada la empresa/trabajador</span>":""):"";}
   tCvRef();
 }
 function tCvRef(){
