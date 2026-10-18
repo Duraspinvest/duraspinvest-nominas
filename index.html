@@ -241,11 +241,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
     <div class="modal-title" id="trTitle">Nuevo trabajador</div>
     <input type="hidden" id="tId">
     <div class="mg2">
-      <div class="fg"><label class="fl">Empresa *</label><select class="fi2" id="tEmp"></select></div>
+      <div class="fg"><label class="fl">Empresa *</label><select class="fi2" id="tEmp" onchange="tCvCatFill()"></select></div>
       <div class="fg"><label class="fl">Nombre y apellidos *</label><input class="fi2" id="tNom"></div>
       <div class="fg"><label class="fl">DNI/NIE</label><input class="fi2" id="tDni"></div>
       <div class="fg"><label class="fl">NAF (nº afiliación SS)</label><input class="fi2" id="tNaf"></div>
-      <div class="fg"><label class="fl">Categoría / convenio</label><input class="fi2" id="tCat"></div>
+      <div class="fg"><label class="fl">Categoría / convenio (texto de la nómina)</label><input class="fi2" id="tCat"></div>
+      <div class="fg"><label class="fl">Categoría en la tabla del convenio</label><select class="fi2" id="tCvCat" onchange="tCvRef()"></select><div id="tCvRef" style="font-size:11px;margin-top:3px;"></div></div>
       <div class="fg"><label class="fl">Grupo de cotización (1-11)</label><input type="number" class="fi2" id="tGrupo" value="9"></div>
       <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
       <div class="fg"><label class="fl">Fecha de alta</label><input type="date" class="fi2" id="tAlta" title="Vacía = la de antigüedad. Si entra a mitad de mes, la nómina sale proporcional"></div>
@@ -425,10 +426,11 @@ function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.
 const CV_SEED={id:"cv_aparcamientos_cat",nombre:"Aparcamientos, estacionamientos regulados, garajes, lavado y engrase de vehículos de Cataluña",codigo:"79001575011999",ambito:"Cataluña (autonómico)",vigDesde:"2017-01-01",vigHasta:"2027-12-31",
   boletin:"https://dogc.gencat.cat/",notas:"V Convenio 2017-2022 prorrogado. Pagas (art. 38): marzo, julio y Navidad, 30 días de salario base + antigüedad; julio antes del 15/7, Navidad antes del 15/12, marzo antes del 15/3. El convenio no fija el periodo de devengo: criterio aplicado = marzo año natural anterior, julio 12 meses anteriores, Navidad año natural. Festivo trabajado (art. 44): gratificación adicional 17,61 € (2026). Tablas 2026: prórroga +2,5 % provisional.",
   numPagas:3,diasPaga:30,pagasCfg:[{n:"Paga de marzo",mes:3,dev:"anioAnt"},{n:"Paga de julio",mes:7,dev:"m12"},{n:"Paga de Navidad",mes:12,dev:"anio"}],
-  revisiones:[{fecha:"2020-11-17",desc:"V Convenio 2017-2022 · Resolución TSF/2841/2020 · DOGC núm. 8273",url:""},{fecha:"2026-04-29",desc:"Acuerdo parcial: prórroga y tablas salariales 2025, 2026 y 2027 · Resolución EMT/1222/2026 · DOGC núm. 9655",url:""}],
+  revisiones:[],
   tablas:[["A-1) Técnico superior",2174.25],["A-2) Técnico medio",2000.80],["A-3) Diplomado",1908.29],["B a.1) Jefe de servicios",1686.02],["B a.2) Jefe de sección",1643.97],["B a.3) Oficial administrativo",1608.32],["B a.4) Auxiliar administrativo",1501.14],
     ["C-1) Encargado aparcamiento",1643.97],["C-3) Agente aparcamiento",1584.47],["C-4) Auxiliar aparcamiento",1501.14],["C-5) Agente mantenimiento",1584.47],["C-6) Auxiliar de mantenimiento",1501.14],["C-1.b) Encargado de autolavado",1643.97],["C-7) Agente de autolavado",1584.47],["C-8) Auxiliar de autolavado",1501.14]]
-    .map(([c,v])=>({anio:2026,categoria:c,importe:v,unidad:"mes",nota:"Barcelona · jornada completa"})),docs:[]};
+    .map(([c,v])=>({anio:2026,categoria:c,importe:v,unidad:"mes",nota:"Barcelona · jornada completa"})),
+  docs:[{nombre:"",path:"",key:"ref_2020",desc:"V Convenio 2017-2022 · Resolución TSF/2841/2020 · DOGC núm. 8273",fecha:"2026-10-18",fechaPub:"2020-11-17",url:""},{nombre:"",path:"",key:"ref_2026",desc:"Acuerdo parcial: prórroga y tablas 2025, 2026 y 2027 · Resolución EMT/1222/2026 · DOGC núm. 9655",fecha:"2026-10-18",fechaPub:"2026-04-29",url:""}]};
 function cvEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 function cvFecha(f){return f?String(f).split("-").reverse().join("/"):"";}
 function renderConvList(){
@@ -449,7 +451,7 @@ function cvCapturar(){
   const c=window._cv;if(!c||!document.getElementById("cvNom"))return c;
   const v=id=>(document.getElementById(id)||{}).value||"";
   Object.assign(c,{nombre:v("cvNom").trim(),codigo:v("cvCod").trim(),ambito:v("cvAmb").trim(),vigDesde:v("cvDes"),vigHasta:v("cvHas"),boletin:v("cvBol").trim(),notas:v("cvNot"),numPagas:num(v("cvNP")),diasPaga:num(v("cvDP"))});
-  c.revisiones=[].map.call(document.querySelectorAll("#cvRev .cvr"),r=>({fecha:r.querySelector(".rf").value,desc:r.querySelector(".rd").value.trim(),url:r.querySelector(".ru").value.trim()})).filter(r=>r.fecha||r.desc);
+  c.revisiones=[];
   c.tablas=[].map.call(document.querySelectorAll("#cvTab .cvt"),r=>({anio:num(r.querySelector(".ta").value),categoria:r.querySelector(".tc").value.trim(),importe:num(r.querySelector(".ti").value),unidad:r.querySelector(".tu").value,nota:r.querySelector(".tn").value.trim()})).filter(r=>r.categoria);
   c.pagasCfg=[].map.call(document.querySelectorAll("#cvPag .pagrow"),r=>({n:r.querySelector(".gn").value.trim(),mes:num(r.querySelector(".gm").value),dev:r.querySelector(".gd").value})).filter(x=>x.mes);
   return c;
@@ -463,12 +465,17 @@ function cvPintar(){
   const pag=[0,1,2,3].map(i=>(c.pagasCfg||[])[i]||{}).map(r=>"<div class='pagrow' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'><input class='fi2 gn' style='flex:1;min-width:120px;' placeholder='Nombre (p. ej. Paga de marzo)' value=\""+cvEsc(r.n||"")+"\">"+
     "<select class='fi2 gm' style='width:auto;'><option value=''>— mes de pago —</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(r.mes)===k+1?" selected":"")+">"+m+"</option>").join("")+"</select>"+
     "<select class='fi2 gd' style='width:auto;'>"+Object.entries(DEV_PAGA).map(([k,l])=>"<option value='"+k+"'"+((r.dev||"anio")===k?" selected":"")+">Devengo: "+l+"</option>").join("")+"</select></div>").join("");
+  (c.docs||[]).forEach(d=>{if(!d.fechaPub){const m=String(d.desc||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)d.fechaPub=m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");}});
+  if(Array.isArray(c.revisiones)&&c.revisiones.length&&!(c.docs||[]).some(d=>d.path)){c.docs=(c.docs||[]).concat(c.revisiones.filter(r=>r.fecha||r.desc).map(r=>({nombre:"",path:"",desc:r.desc,fecha:r.fecha,fechaPub:r.fecha,url:r.url||""})));}
+  c.revisiones=[];
   const rev=(c.revisiones||[]).map((r,i)=>"<div class='cvr' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'><input class='fi2 rf' type='date' style='width:150px;' value='"+cvEsc(r.fecha)+"'><input class='fi2 rd' style='flex:2;min-width:200px;' placeholder='Qué cambia (prórroga, tablas, revisión…) y referencia del boletín' value=\""+cvEsc(r.desc)+"\"><input class='fi2 ru' style='flex:1;min-width:140px;' placeholder='Enlace (opcional)' value=\""+cvEsc(r.url)+"\">"+(r.url?"<a href='"+cvEsc(r.url)+"' target='_blank' rel='noopener' class='btn btn-secondary btn-sm'>Abrir</a>":"")+"<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDelRow('revisiones',"+i+")\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin revisiones.</div>";
   const anios=[...new Set((c.tablas||[]).map(t=>t.anio))].sort((a,b)=>b-a);
   const tab=(c.tablas||[]).map((t,i)=>"<div class='cvt' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'><input class='fi2 ta' type='number' style='width:80px;' value='"+cvEsc(t.anio)+"'><input class='fi2 tc' style='flex:2;min-width:180px;' placeholder='Grupo / categoría' value=\""+cvEsc(t.categoria)+"\"><input class='fi2 ti' type='number' step='0.0001' style='width:110px;' value='"+cvEsc(t.importe)+"'>"+
     "<select class='fi2 tu' style='width:auto;'><option value='mes'"+(t.unidad==="mes"?" selected":"")+">€/mes</option><option value='dia'"+(t.unidad==="dia"?" selected":"")+">€/día</option><option value='anio'"+(t.unidad==="anio"?" selected":"")+">€/año</option><option value='hora'"+(t.unidad==="hora"?" selected":"")+">€/hora</option></select>"+
     "<input class='fi2 tn' style='flex:1;min-width:120px;' placeholder='Nota (provincia, jornada…)' value=\""+cvEsc(t.nota)+"\"><button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDelRow('tablas',"+i+")\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin tablas.</div>";
-  const docs=(c.docs||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(d=>"<div style='display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed #e5e7eb;font-size:13px;'><span style='flex:1;'>📄 <b>"+cvEsc(d.desc||d.nombre)+"</b> <span style='color:#888;font-size:11px;'>"+cvEsc(d.nombre)+" · "+cvFecha(d.fecha)+(d.size?" · "+Math.round(d.size/1024)+" KB":"")+"</span></span><button class='btn btn-secondary btn-sm' onclick=\"cvDocAbrir('"+cvEsc(d.path)+"')\">Abrir</button><button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDocBorrar('"+cvEsc(d.path)+"')\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin documentos. Sube el PDF del convenio y de cada revisión.</div>";
+  (c.docs||[]).forEach((d,i)=>{if(!d.key)d.key=d.path||("ref"+i+"_"+Date.now());});
+  const docs=(c.docs||[]).slice().sort((a,b)=>String(b.fechaPub||b.fecha).localeCompare(String(a.fechaPub||a.fecha))).map(d=>"<div style='display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed #e5e7eb;font-size:13px;'><span style='width:84px;color:#555;font-size:12px;'>"+cvFecha(d.fechaPub||d.fecha)+"</span><span style='flex:1;'>"+(d.path?"📄":"🔗")+" <b>"+cvEsc(d.desc||d.nombre)+"</b> <span style='color:#888;font-size:11px;'>"+(d.path?cvEsc(d.nombre)+(d.size?" · "+Math.round(d.size/1024)+" KB":""):"sin PDF")+"</span></span>"+
+    (d.url?"<a class='btn btn-secondary btn-sm' href='"+cvEsc(d.url)+"' target='_blank' rel='noopener'>Boletín</a>":"")+(d.path?"<button class='btn btn-secondary btn-sm' onclick=\"cvDocAbrir('"+cvEsc(d.path)+"')\">Abrir</button>":"")+"<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDocBorrar('"+cvEsc(d.key)+"')\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin documentos. Sube el PDF del convenio y de cada revisión.</div>";
   const emp=Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.nombre||e.id);
   box.innerHTML="<div class='card' style='margin-top:14px;border:2px solid #C7D2FE;'>"+
     "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'><h2 style='margin:0;'>"+(c.nombre?cvEsc(c.nombre):"Nuevo convenio")+"</h2><div style='display:flex;gap:6px;'><button class='btn btn-primary' onclick='cvGuardar()'>Guardar convenio</button><button class='btn btn-secondary' onclick='window._cv=null;cvPintar()'>Cerrar</button></div></div>"+
@@ -478,30 +485,34 @@ function cvPintar(){
       "<div class='fg' style='grid-column:1/-1;'><label class='fl'>Notas (pagas, pluses, festivos, jornada, antigüedad…)</label><textarea class='fi2' id='cvNot' rows='4'>"+cvEsc(c.notas)+"</textarea></div></div>"+
     "<div style='font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;'>Pagas extra (se copian a los trabajadores con «Copiar pagas del convenio»)</div>"+
     "<div class='mg2' style='max-width:420px;'>"+inp("cvNP","Nº de pagas",c.numPagas,"number")+inp("cvDP","Días por paga",c.diasPaga,"number")+"</div><div id='cvPag' style='margin-top:6px;'>"+pag+"</div>"+
-    "<div style='display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;'><span style='font-weight:600;color:var(--navy);font-size:13px;'>Revisiones y prórrogas</span><button class='btn btn-secondary btn-sm' onclick='cvAddRev()'>+ Revisión</button></div><div id='cvRev'>"+rev+"</div>"+
+
     "<div style='display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;'><span style='font-weight:600;color:var(--navy);font-size:13px;'>Tablas salariales"+(anios.length?" ("+anios.join(", ")+")":"")+"</span><button class='btn btn-secondary btn-sm' onclick='cvAddTab()'>+ Fila</button></div><div id='cvTab'>"+tab+"</div>"+
     "<div style='font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;'>Documentos (PDF del convenio, prórrogas, tablas)</div><div id='cvDocs'>"+docs+"</div>"+
-    "<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;'><input class='fi2' id='cvDocDesc' style='flex:1;min-width:200px;' placeholder='Descripción (p. ej. Prórroga y tablas 2025-2027, DOGC 29/04/2026)'><input type='file' id='cvDocFile' accept='.pdf,application/pdf,image/*'><button class='btn btn-primary btn-sm' onclick='cvDocSubir()'>Subir</button><span id='cvDocMsg' style='font-size:12px;color:#555;'></span></div>"+
+    "<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;'><input class='fi2' id='cvDocFecha' type='date' style='width:150px;' title='Fecha de publicación en el boletín'><input class='fi2' id='cvDocDesc' style='flex:2;min-width:200px;' placeholder='Descripción (p. ej. Prórroga y tablas 2025-2027 · DOGC)'><input class='fi2' id='cvDocUrl' style='flex:1;min-width:140px;' placeholder='Enlace al boletín (opcional)'><input type='file' id='cvDocFile' accept='.pdf,application/pdf,image/*'><button class='btn btn-primary btn-sm' onclick='cvDocSubir()'>Añadir</button><span id='cvDocMsg' style='font-size:12px;color:#555;'></span></div><div style='font-size:11px;color:#888;margin-top:2px;'>Fecha = publicación en el boletín. Sin archivo se guarda como referencia (p. ej. una revisión de la que aún no tienes el PDF).</div>"+
+    "<div style='font-weight:600;color:var(--navy);margin:16px 0 6px;font-size:13px;'>Trabajadores vinculados (última tabla)</div>"+cvAfectadosHTML(c)+
     "</div>";
 }
 async function cvGuardar(){const c=cvCapturar();if(!c.nombre){alert("Pon el nombre del convenio.");return;}c.act=new Date().toISOString();await fbSet("nom_convenios",c.id,c);alert("Convenio guardado.");}
 async function cvDocSubir(){
-  const c=cvCapturar();const f=(document.getElementById("cvDocFile").files||[])[0];if(!f){alert("Elige un archivo.");return;}
+  const c=cvCapturar();const f=(document.getElementById("cvDocFile").files||[])[0];
+  const fp=document.getElementById("cvDocFecha").value,url=(document.getElementById("cvDocUrl").value||"").trim(),desc=(document.getElementById("cvDocDesc").value||"").trim();
+  if(!f){if(!desc){alert("Escribe una descripción o elige un archivo.");return;}c.docs=(c.docs||[]).concat([{nombre:"",path:"",desc,fecha:new Date().toISOString().slice(0,10),fechaPub:fp,url,key:"ref"+Date.now()}]);if(!c.nombre)c.nombre="(sin nombre)";await fbSet("nom_convenios",c.id,c);cvPintar();return;}
   if(f.size>25*1024*1024){alert("Máximo 25 MB.");return;}
   const msg=document.getElementById("cvDocMsg");msg.textContent="Subiendo…";
   try{
     const path="convenios/"+c.id+"/"+Date.now()+"_"+f.name.replace(/[^\w.\-]+/g,"_");
     await window.stUpload(window.stRef(window.storage,path),f,{contentType:f.type||"application/pdf"});
-    c.docs=(c.docs||[]).concat([{nombre:f.name,path,desc:(document.getElementById("cvDocDesc").value||"").trim(),fecha:new Date().toISOString().slice(0,10),size:f.size}]);
+    c.docs=(c.docs||[]).concat([{nombre:f.name,path,key:path,desc,fecha:new Date().toISOString().slice(0,10),fechaPub:fp,url,size:f.size}]);
     if(!c.nombre)c.nombre="(sin nombre)";
     await fbSet("nom_convenios",c.id,c);msg.textContent="Subido.";cvPintar();
   }catch(e){console.error(e);msg.textContent="";alert("No se pudo subir: "+e.message+"\n\nSi dice «unauthorized», falta la regla de Storage para la carpeta convenios/.");}
 }
 async function cvDocAbrir(path){try{const u=await window.stUrl(window.stRef(window.storage,path));window.open(u,"_blank","noopener");}catch(e){alert("No se pudo abrir: "+e.message);}}
-async function cvDocBorrar(path){
+async function cvDocBorrar(key){
   if(!confirm("¿Borrar este documento? No se puede deshacer."))return;
-  const c=cvCapturar();try{await window.stDelete(window.stRef(window.storage,path));}catch(e){console.warn(e);}
-  c.docs=(c.docs||[]).filter(d=>d.path!==path);await fbSet("nom_convenios",c.id,c);cvPintar();
+  const c=cvCapturar();const d=(c.docs||[]).find(x=>x.key===key||x.path===key);
+  if(d&&d.path){try{await window.stDelete(window.stRef(window.storage,d.path));}catch(e){console.warn(e);}}
+  c.docs=(c.docs||[]).filter(x=>x!==d);await fbSet("nom_convenios",c.id,c);cvPintar();
 }
 function tCopiarPagasConv(){
   const emp=(window.WE||{})[document.getElementById("tEmp").value]||{};const c=(window.WCV||[]).find(x=>x.id===emp.convenioId);
@@ -511,6 +522,72 @@ function tCopiarPagasConv(){
   tSalUI();
 }
 Object.assign(window,{renderConvList,cvSeed,cvNuevo,cvAbrir,cvAddRev,cvAddTab,cvDelRow,cvPintar,cvGuardar,cvDocSubir,cvDocAbrir,cvDocBorrar,tCopiarPagasConv});
+
+// ---- Categoría del convenio en el trabajador ----
+function cvDeEmpresa(empId){const e=(window.WE||{})[empId]||{};return (window.WCV||[]).find(x=>x.id===e.convenioId)||null;}
+function cvUltAnio(c){const a=(c&&c.tablas||[]).map(t=>num(t.anio)).filter(Boolean);return a.length?Math.max(...a):0;}
+function cvFila(c,cat,anio){return (c&&c.tablas||[]).find(t=>t.categoria===cat&&num(t.anio)===num(anio))||null;}
+// salario que corresponde según tabla: importe × % jornada (los importes de la ficha del trabajador van ya proporcionales)
+function cvSalTabla(t,c,anio){const f=cvFila(c,t.cvCat,anio||cvUltAnio(c));if(!f)return null;const jor=(num(t.jornadaPct)||100)/100;
+  return {fila:f,anio:num(f.anio),unidad:f.unidad,importe:num(f.importe),propuesto:f.unidad==="dia"?Math.round(num(f.importe)*jor*10000)/10000:r2(num(f.importe)*jor)};}
+function tCvCatFill(){
+  const s=document.getElementById("tCvCat");if(!s)return;const c=cvDeEmpresa(val("tEmp"));const cur=s.dataset.v||s.value;
+  const an=cvUltAnio(c),cats=[...new Set((c&&c.tablas||[]).filter(t=>num(t.anio)===an).map(t=>t.categoria))];
+  s.innerHTML="<option value=''>"+(c?"— sin vincular —":"(la empresa no tiene convenio con tablas)")+"</option>"+cats.map(x=>"<option"+(x===cur?" selected":"")+">"+cvEsc(x)+"</option>").join("");
+  if(cur&&!cats.includes(cur))s.innerHTML+="<option selected>"+cvEsc(cur)+"</option>";
+  tCvRef();
+}
+function tCvRef(){
+  const box=document.getElementById("tCvRef");if(!box)return;const c=cvDeEmpresa(val("tEmp"));const cat=val("tCvCat");
+  if(!c||!cat){box.innerHTML="";return;}
+  const t={cvCat:cat,jornadaPct:num(val("tJornada"))||100};const r=cvSalTabla(t,c);if(!r){box.innerHTML="<span style='color:#B45309;'>Esa categoría no está en la última tabla del convenio.</span>";return;}
+  const actual=num(val("tSalBase")),diaria=val("tTipoSal")==="diario";
+  const ok=(r.unidad==="dia")===diaria&&Math.abs(actual-r.propuesto)<0.005;
+  box.innerHTML="Tabla "+r.anio+": "+String(r.importe).replace(".",",")+" €/"+(r.unidad==="dia"?"día":"mes")+(t.jornadaPct<100?" × "+t.jornadaPct+" % = <b>"+String(r.propuesto).replace(".",",")+"</b>":"")+
+    (ok?" <span style='color:#059669;font-weight:600;'>✓ coincide con el salario base</span>":" <span style='color:#B45309;font-weight:600;'>≠ salario base actual ("+String(actual).replace(".",",")+")</span> <button type='button' class='btn btn-secondary btn-sm' onclick='tCvAplicar()'>Aplicar</button>");
+}
+function tCvAplicar(){const c=cvDeEmpresa(val("tEmp"));const r=cvSalTabla({cvCat:val("tCvCat"),jornadaPct:num(val("tJornada"))||100},c);if(!r)return;
+  document.getElementById("tTipoSal").value=r.unidad==="dia"?"diario":"mensual";document.getElementById("tSalBase").value=r.propuesto;tSalUI();tCvRef();}
+// ---- En la ficha del convenio: trabajadores afectados por la tabla nueva ----
+function cvAfectados(c){
+  const an=cvUltAnio(c);if(!an)return [];
+  const emps=Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.id);
+  return (window.WT||[]).filter(t=>emps.includes(t.empresaId)&&t.cvCat&&!t.fechaBaja).map(t=>{const r=cvSalTabla(t,c,an);return {t,r,dif:r?(r.propuesto-num(t.salarioBase)):null};});
+}
+function cvAfectadosHTML(c){
+  const L=cvAfectados(c);const an=cvUltAnio(c);
+  const sinCat=(window.WT||[]).filter(t=>Object.values(window.WE||{}).some(e=>e.convenioId===c.id&&e.id===t.empresaId)&&!t.cvCat&&!t.fechaBaja).length;
+  if(!L.length)return "<div style='font-size:12px;color:#888;'>Ningún trabajador vinculado a una categoría"+(sinCat?" ("+sinCat+" sin vincular: elige su categoría en la ficha del trabajador)":"")+".</div>";
+  return "<div class='tabla-wrapper'><table><thead><tr><th>Trabajador</th><th>Categoría</th><th class='td-r'>Salario actual</th><th class='td-r'>Tabla "+an+" × jornada</th><th class='td-r'>Diferencia</th><th></th></tr></thead><tbody>"+
+    L.map(({t,r,dif})=>"<tr><td>"+cvEsc(t.nombre)+"</td><td style='font-size:12px;'>"+cvEsc(t.cvCat)+"</td><td class='td-r'>"+String(num(t.salarioBase)).replace(".",",")+"</td><td class='td-r'>"+(r?String(r.propuesto).replace(".",",")+" €/"+(r.unidad==="dia"?"día":"mes"):"<span style='color:#B45309;'>no está en la tabla</span>")+"</td><td class='td-r' style='font-weight:600;color:"+(r&&Math.abs(dif)>=0.005?"#B45309":"#059669")+";'>"+(r?(Math.abs(dif)<0.005?"✓":(dif>0?"+":"")+String(Math.round(dif*10000)/10000).replace(".",",")):"")+"</td><td>"+
+      (r&&Math.abs(dif)>=0.005?"<button class='btn btn-secondary btn-sm' onclick=\"cvActualizar('"+c.id+"','"+t.id+"')\">Actualizar…</button>":"")+"</td></tr>").join("")+"</tbody></table></div>"+
+    (sinCat?"<div style='font-size:11px;color:#888;margin-top:4px;'>"+sinCat+" trabajador(es) de estas empresas sin categoría vinculada.</div>":"");
+}
+// Actualiza el salario a la tabla y, si la tabla tiene efectos anteriores, calcula los atrasos de las nóminas ya cerradas y crea el plus L03
+async function cvActualizar(cid,tid){
+  const c=(window.WCV||[]).find(x=>x.id===cid),t=(window.WT||[]).find(x=>x.id===tid);if(!c||!t)return;
+  const r=cvSalTabla(t,c);if(!r)return;const viejo=num(t.salarioBase),dif=r.propuesto-viejo;
+  const desde=prompt("Nuevo salario base de "+t.nombre+": "+r.propuesto+" (antes "+viejo+").\n\n¿Desde qué mes tiene efectos la tabla "+r.anio+"? (1-12)\nSe calcularán atrasos de los meses de "+ANIO+" ya CERRADOS desde ese mes. Deja vacío si no hay atrasos.","1");
+  if(desde===null)return;
+  const m0=parseInt(desde,10);let atr=0,det=[];
+  if(m0>=1&&m0<=12){
+    (window.WN||[]).filter(n=>n.trabajadorId===t.id&&num(n.anio)===ANIO&&num(n.mes)>=m0).sort((a,b)=>a.mes-b.mes).forEach(n=>{
+      const dias=num(n.dias)||30,dm=new Date(ANIO,num(n.mes),0).getDate();
+      const d=r.unidad==="dia"?dif*dias:dif*(dias>=dm?1:Math.min(30,dias)/30);
+      const pr=t.pagasProrrateadas&&num(c.numPagas)?dif*num(c.numPagas)*(r.unidad==="dia"?num(c.diasPaga||30):1)/12*(dias>=dm?1:dias/dm):0;
+      atr+=d+pr;det.push(MESES[n.mes-1]+": "+(Math.round((d+pr)*100)/100).toFixed(2));});
+  }
+  atr=r2(atr);
+  const t2={...t,salarioBase:r.propuesto,tipoSalario:r.unidad==="dia"?"diario":"mensual"};
+  if(r.unidad!=="dia"&&num(c.numPagas)&&num(c.diasPaga||30)===30)t2.pagasAnual=r2(r.propuesto*num(c.numPagas));
+  let msg="Salario actualizado.";
+  if(atr>0&&confirm("Atrasos calculados: "+atr.toFixed(2).replace(".",",")+" €\n"+det.join("\n")+"\n\n¿Añadir un plus «Atrasos convenio "+r.anio+"» (L03) en la nómina de "+MESES[new Date().getMonth()]+"?\nOjo: si las pagas NO van prorrateadas y ya se cobró alguna en ese periodo, su diferencia no está incluida.")){
+    t2.pluses=(t.pluses||[]).concat([{nombre:"Atrasos convenio "+r.anio,importe:atr,cotiza:true,irpf:true,mes:new Date().getMonth()+1,l03:true,unidad:"mes",baseL03:""}]);
+    msg+=" Plus de atrasos L03 añadido en "+MESES[new Date().getMonth()].toLowerCase()+".";
+  }
+  await fbSet("nom_trabajadores",t.id,t2);alert(msg);cvPintar();
+}
+Object.assign(window,{tCvCatFill,tCvRef,tCvAplicar,cvActualizar});
 
 // ---- Cobro automático de pagas no prorrateadas ----
 const DEV_PAGA={anioAnt:"Año natural anterior (1/1–31/12)",anio:"Año natural del pago (1/1–31/12)",m12:"12 meses anteriores al mes de pago",sem:"Semestre natural (ene–jun / jul–dic)"};
@@ -614,6 +691,7 @@ function openTrab(id){
   document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
   window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
   renderPluses();renderPagasCfg(t&&Array.isArray(t.pagasCfg)?t.pagasCfg:[]);tSalUI();
+  {const s=document.getElementById("tCvCat");s.dataset.v=t&&t.cvCat||"";tCvCatFill();s.dataset.v="";}
   document.getElementById("tMsg").textContent="";
   document.getElementById("trModal").classList.add("open");
 }
@@ -626,7 +704,7 @@ async function saveTrab(){
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:normDni(val("tDni")),naf:val("tNaf"),unidades:((window.WT||[]).find(x=>x.id===id)||{}).unidades||{},
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
-    jornadaPct:num(val("tJornada"))||100,sinDesempleo:document.getElementById("tSinDes").checked,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
+    jornadaPct:num(val("tJornada"))||100,sinDesempleo:document.getElementById("tSinDes").checked,cvCat:val("tCvCat"),horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pagasCfg:capturePagasCfg(),
     pagasAnual:val("tTipoSal")==="diario"?pagasAnualDiario({salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]}):num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
