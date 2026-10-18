@@ -102,7 +102,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18-sectores</div></div>
+  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18b</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Despacho</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">Fiscal</a>
@@ -552,14 +552,29 @@ async function cvLeerIA(key){
   const c=cvCapturar();const d=(c.docs||[]).find(x=>x.key===key||x.path===key);if(!d||!d.path)return;
   const prov=prompt("¿De qué provincia tomo la tabla salarial si el convenio trae varias?","Barcelona");if(prov===null)return;
   const box=document.getElementById("cvIA");const msg=t=>{box.innerHTML="<div class='warn'>"+t+"</div>";};
+  const espera=ms=>new Promise(r=>setTimeout(r,ms));
+  const explicaApi=det=>{const t=String(det||"");
+    if(/rate_limit|429/i.test(t))return "límite de uso de la API por minuto (el PDF es grande)";
+    if(/overloaded|529/i.test(t))return "la IA está saturada en este momento";
+    if(/100 PDF pages|maximum of 100|too many pages|page/i.test(t)&&/pdf/i.test(t))return "el PDF tiene más de 100 páginas: sube solo las páginas de tablas y anexos";
+    if(/too large|request_too_large|413|32 ?MB/i.test(t))return "el PDF es demasiado grande para enviarlo a la IA";
+    if(/credit|billing/i.test(t))return "falta saldo en la cuenta de la API de Anthropic";
+    return "";};
   const llamar=async extra=>{
+   for(let intento=1;;intento++){
     const tk=await window.auth.currentUser.getIdToken();
     const resp=await fetch(LEER_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tk},body:JSON.stringify({storagePath:d.path,tipo:"application/pdf",modo:"convenio",provincia:prov,...extra})});
     let j;try{j=await resp.json();}catch(_){throw new Error("el servidor no respondió bien (HTTP "+resp.status+"); si tarda mucho, el documento puede ser demasiado largo");}
-    if(!j.ok||!j.datos)throw new Error(j.error||"sin datos");
+    if(!j.ok||!j.datos){
+      const det=typeof j.detalle==="string"?j.detalle:JSON.stringify(j.detalle||"");
+      const porque=explicaApi(det);
+      if(/rate_limit|429|overloaded|529/i.test(det)&&intento<4){const seg=intento*40;msg("La IA pide esperar ("+porque+"). Reintento "+intento+" de 3 en "+seg+" s…");await espera(seg*1000);continue;}
+      throw new Error((j.error||"sin datos")+(porque?" — "+porque:"")+(det&&!porque?" — "+det.slice(0,300):""));
+    }
     let datos=j.datos;
     if(datos.raw!==undefined){const r=cvJsonReparar(datos.raw);if(!r){window._cvIARaw=String(datos.raw||"");throw new Error("la IA devolvió un texto que no se puede interpretar");}datos=r;}
     return datos;
+   }
   };
   const nom=cvEsc(d.desc||d.nombre);
   try{
