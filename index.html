@@ -551,14 +551,40 @@ const LEER_URL="https://leerdocumento-gyc3opqqlq-ew.a.run.app";
 async function cvLeerIA(key){
   const c=cvCapturar();const d=(c.docs||[]).find(x=>x.key===key||x.path===key);if(!d||!d.path)return;
   const prov=prompt("¿De qué provincia tomo la tabla salarial si el convenio trae varias?","Barcelona");if(prov===null)return;
-  const box=document.getElementById("cvIA");box.innerHTML="<div class='warn'>Leyendo «"+cvEsc(d.desc||d.nombre)+"» con IA… (un convenio largo puede tardar 1-2 minutos)</div>";
-  try{
+  const box=document.getElementById("cvIA");const msg=t=>{box.innerHTML="<div class='warn'>"+t+"</div>";};
+  const llamar=async extra=>{
     const tk=await window.auth.currentUser.getIdToken();
-    const resp=await fetch(LEER_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tk},body:JSON.stringify({storagePath:d.path,tipo:"application/pdf",modo:"convenio",provincia:prov})});
+    const resp=await fetch(LEER_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tk},body:JSON.stringify({storagePath:d.path,tipo:"application/pdf",modo:"convenio",provincia:prov,...extra})});
     let j;try{j=await resp.json();}catch(_){throw new Error("el servidor no respondió bien (HTTP "+resp.status+"); si tarda mucho, el documento puede ser demasiado largo");}
     if(!j.ok||!j.datos)throw new Error(j.error||"sin datos");
     let datos=j.datos;
     if(datos.raw!==undefined){const r=cvJsonReparar(datos.raw);if(!r){window._cvIARaw=String(datos.raw||"");throw new Error("la IA devolvió un texto que no se puede interpretar");}datos=r;}
+    return datos;
+  };
+  const nom=cvEsc(d.desc||d.nombre);
+  try{
+    msg("Leyendo «"+nom+"» con IA: buscando los sectores del convenio…");
+    const ind=await llamar({fase:"indice"});
+    let datos;
+    const secs=(ind.sectores||[]).filter(x=>x&&x.nombre);
+    if((ind.tablas||[]).length&&!secs.length){datos=ind;}            // función antigua: ya trae todo
+    else if(secs.length>=2){
+      datos={...ind,sectores:[],tablas:[],_fallos:[]};
+      for(let k=0;k<secs.length;k++){
+        const sn=String(secs[k].nombre);
+        msg("Leyendo «"+nom+"» con IA: sector "+(k+1)+" de "+secs.length+" — <b>"+cvEsc(sn)+"</b>… (cada sector tarda unos segundos)");
+        try{
+          const r=await llamar({fase:"sector",sector:sn+(secs[k].paginas?" (páginas "+secs[k].paginas+")":"")});
+          const so=r.sector||{};datos.sectores.push({...so,nombre:sn});
+          (r.tablas||[]).forEach(t=>{if(t&&t.categoria)datos.tablas.push({...t,sector:sn,anio:t.anio||ind.anioTablas});});
+          if(r._cortado)datos._cortado=true;
+          if(!(r.tablas||[]).length)datos._fallos.push(sn+" (sin tablas)");
+        }catch(e){console.error(e);datos._fallos.push(sn+" ("+e.message+")");datos.sectores.push({nombre:sn});}
+      }
+    } else {
+      msg("Leyendo «"+nom+"» con IA… (un convenio largo puede tardar 1-2 minutos)");
+      datos=await llamar({});
+    }
     window._cvIA={datos,key};cvIAPintar();
   }catch(e){console.error(e);const raw=window._cvIARaw;window._cvIARaw=null;
     box.innerHTML="<div class='warn'>No se pudo leer: "+cvEsc(e.message)+". Si dice «Ruta no válida», falta desplegar la función nueva."+
@@ -591,6 +617,7 @@ function cvIAPintar(){
   const pub=x.publicacion||{};
   box.innerHTML="<div style='border:2px solid #A7F3D0;background:#F0FDF4;border-radius:10px;padding:10px 12px;margin:8px 0;'>"+
     "<div style='font-weight:700;color:#065F46;margin-bottom:6px;'>Leído con IA ("+cvEsc(x.tipoDoc||"documento")+") — revisa antes de aplicar</div>"+
+    ((x._fallos||[]).length?"<div class='warn' style='margin-bottom:6px;'>⚠ No se pudieron leer bien: "+x._fallos.map(cvEsc).join("; ")+". Aplica lo demás y vuelve a pulsar «Leer con IA» más tarde: solo se añaden las filas que falten.</div>":"")+
     (x._cortado?"<div class='warn' style='margin-bottom:6px;'>⚠ La respuesta de la IA llegó incompleta (documento muy largo). Puede faltar el final de las tablas o las notas: compáralo con el PDF.</div>":"")+
     "<table style='font-size:12px;width:100%;'>"+fila("Nombre",x.nombre)+fila("Código",x.codigo)+fila("Ámbito",x.ambito)+fila("Vigencia",(x.vigDesde||"")+" – "+(x.vigHasta||""))+fila("Publicación",[pub.boletin,cvFecha(pub.fecha),pub.referencia].filter(Boolean).join(" · "))+
     fila("Pagas",(x.numPagas||"")+" × "+(x.diasPaga||"")+" días · "+(x.conceptoPagas||""))+
