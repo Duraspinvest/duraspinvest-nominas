@@ -252,7 +252,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg" id="tPagasAnualG"><label class="fl">Importe ANUAL de pagas extra</label><input type="number" step="0.01" class="fi2" id="tPagasAnual" value="0" oninput="tPrev()"></div>
       <div class="fg tDiaG" style="display:none;"><label class="fl">Nº de pagas extra</label><input type="number" step="1" class="fi2" id="tNumPagas" value="2" oninput="tPrev()"></div>
       <div class="fg tDiaG" style="display:none;"><label class="fl">Días por paga</label><input type="number" step="1" class="fi2" id="tDiasPaga" value="30" oninput="tPrev()"></div>
-      <div class="fg"><label class="fl">&nbsp;</label><label style="display:flex;align-items:center;gap:7px;font-size:13px;height:38px;"><input type="checkbox" id="tProrrateadas" style="width:16px;height:16px;"> Pagas prorrateadas</label></div>
+      <div class="fg"><label class="fl">&nbsp;</label><label style="display:flex;align-items:center;gap:7px;font-size:13px;height:38px;"><input type="checkbox" id="tProrrateadas" onchange="tSalUI()" style="width:16px;height:16px;"> Pagas prorrateadas</label></div>
+    </div>
+    <div id="tPagasCfgG" style="margin-top:8px;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px;">
+      <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:4px;">Cobro de las pagas extra (solo si NO van prorrateadas)</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">La app añade cada paga en su mes, proporcional a los días de alta dentro de su periodo de devengo. Tributa IRPF ese mes y no suma a la base (ya cotiza con la prorrata). Deja el mes vacío si no hay más pagas.</div>
+      <div id="tPagasCfg"></div>
     </div>
     <div id="tPrevAn" style="font-size:12px;color:var(--navy);background:#F1F5F9;border-radius:7px;padding:6px 10px;margin-top:6px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;">
@@ -400,6 +405,36 @@ function renderTrab(){
 window.renderTrab=renderTrab;
 function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));s.innerHTML="<option value=''>Seleccionar...</option>"+cs.map(c=>"<option value='"+c.id+"'"+(c.id===sel?" selected":"")+">"+(c.nombre||c.id)+"</option>").join("");}
 // Salario diario: importe anual de pagas = nº pagas × días por paga × (base/día + pluses €/día que cotizan y entran en pagas)
+// ---- Cobro automático de pagas no prorrateadas ----
+const DEV_PAGA={anioAnt:"Año natural anterior (1/1–31/12)",anio:"Año natural del pago (1/1–31/12)",m12:"12 meses anteriores al mes de pago",sem:"Semestre natural (ene–jun / jul–dic)"};
+function renderPagasCfg(cfg){
+  const c=document.getElementById("tPagasCfg");if(!c)return;
+  const rows=[0,1,2,3].map(i=>cfg[i]||{});
+  c.innerHTML=rows.map((r,i)=>"<div class='pagrow' style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'>"+
+    "<input class='fi2 gn' style='flex:1;min-width:120px;' placeholder='Nombre (p. ej. Paga de marzo)' value=\""+String(r.n||"").replace(/"/g,"&quot;")+"\">"+
+    "<select class='fi2 gm' style='width:auto;'><option value=''>— mes de pago —</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(r.mes)===k+1?" selected":"")+">"+m+"</option>").join("")+"</select>"+
+    "<select class='fi2 gd' style='width:auto;'>"+Object.entries(DEV_PAGA).map(([k,l])=>"<option value='"+k+"'"+((r.dev||"anio")===k?" selected":"")+">Devengo: "+l+"</option>").join("")+"</select></div>").join("");
+}
+function capturePagasCfg(){return [].map.call(document.querySelectorAll("#tPagasCfg .pagrow"),r=>({n:r.querySelector(".gn").value.trim(),mes:num(r.querySelector(".gm").value),dev:r.querySelector(".gd").value})).filter(x=>x.mes);}
+function periodoDevengo(dev,mes,anio){
+  const D=(y,m,d)=>new Date(y,m-1,d);
+  if(dev==="anioAnt")return [D(anio-1,1,1),D(anio-1,12,31)];
+  if(dev==="m12")return [D(anio-1,mes,1),new Date(anio,mes-1,0)];
+  if(dev==="sem")return mes<=6?[D(anio,1,1),D(anio,6,30)]:[D(anio,7,1),D(anio,12,31)];
+  return [D(anio,1,1),D(anio,12,31)];
+}
+function pagasDelMes(t,mi){
+  if(t.pagasProrrateadas||!Array.isArray(t.pagasCfg))return [];
+  const cfg=t.pagasCfg.filter(x=>num(x.mes));if(!cfg.length)return [];
+  const total=t.tipoSalario==="diario"?pagasAnualDiario(t):num(t.pagasAnual),imp=total/cfg.length;
+  const fa=parseFecha(t.fechaAlta||t.antiguedad),fb=parseFecha(t.fechaBaja),dd=(a,b)=>Math.round((b-a)/86400000)+1;
+  return cfg.filter(x=>num(x.mes)===mi).map(x=>{
+    const [i,f]=periodoDevengo(x.dev,mi,ANIO);const a=(fa&&fa>i)?fa:i,b=(fb&&fb<f)?fb:f;
+    const dias=b>=a?dd(a,b):0,tot=dd(i,f),fr=dias/tot;
+    return {nombre:(x.n||"Paga extra")+(fr<1?" ("+dias+"/"+tot+" días)":""),importe:r2(imp*fr),cotiza:true,irpf:true,pagaExtra:true,auto:true};
+  }).filter(p=>p.importe);
+}
+window.renderPagasCfg=renderPagasCfg;
 function pagasAnualDiario(t){
   const pd=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>p.unidad==="dia"&&p.cotiza!==false&&!p.l03&&!num(p.mes)&&p.enPagas!==false).reduce((a,p)=>a+num(p.importe),0);
   return r2(num(t.numPagas)*num(t.diasPaga)*(num(t.salarioBase)+pd));
@@ -410,6 +445,7 @@ function tSalUI(){
   document.getElementById("tSalBaseLbl").textContent=d?"Salario base (€/día)":"Salario base mensual";sb.step=d?"0.0001":"0.01";
   document.getElementById("tPagasAnualG").style.display=d?"none":"";
   document.querySelectorAll(".tDiaG").forEach(x=>x.style.display=d?"":"none");
+  const pc=document.getElementById("tPagasCfgG");if(pc)pc.style.display=document.getElementById("tProrrateadas").checked?"none":"";
   tPrev();
 }
 // Previsión de retribución anual (orientativa, para fijar el % de IRPF)
@@ -470,7 +506,7 @@ function openTrab(id){
   set("tTipoSal",t&&t.tipoSalario==="diario"?"diario":"mensual");set("tNumPagas",t&&t.numPagas!=null&&t.numPagas!==""?t.numPagas:2);set("tDiasPaga",t&&t.diasPaga?t.diasPaga:30);
   document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
   window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
-  renderPluses();tSalUI();
+  renderPluses();renderPagasCfg(t&&Array.isArray(t.pagasCfg)?t.pagasCfg:[]);tSalUI();
   document.getElementById("tMsg").textContent="";
   document.getElementById("trModal").classList.add("open");
 }
@@ -484,7 +520,7 @@ async function saveTrab(){
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:normDni(val("tDni")),naf:val("tNaf"),unidades:((window.WT||[]).find(x=>x.id===id)||{}).unidades||{},
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
     jornadaPct:num(val("tJornada"))||100,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
-    salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),
+    salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pagasCfg:capturePagasCfg(),
     pagasAnual:val("tTipoSal")==="diario"?pagasAnualDiario({salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]}):num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
   if(editando){closeM("trModal");return;}
@@ -507,7 +543,8 @@ function calc(t,emp,mi,horasOverride){
   const diario=t.tipoSalario==="diario";
   const pl=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!num(p.mes)||num(p.mes)===mi)
     .map(p=>{if(p.unidad==="ud"){const q=num(((t.unidades||{})[ANIO+"-"+String(mi).padStart(2,"0")]||{})[p.nombre]);return {...p,cantidad:q,precio:num(p.importe),importe:r2(q*num(p.importe))};}
-      return {...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):(p.unidad==="dia"?r2(num(p.importe)*P.diasNat):r2(num(p.importe)*f))};}).filter(p=>p.unidad!=="ud"||p.importe);
+      return {...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):(p.unidad==="dia"?r2(num(p.importe)*P.diasNat):r2(num(p.importe)*f))};}).filter(p=>p.unidad!=="ud"||p.importe)
+    .concat(P.diasNat>0?pagasDelMes(t,mi):[]);
   const salBase=diario?r2(num(t.salarioBase)*P.diasNat):r2(num(t.salarioBase)*f);
   const sumP=g=>pl.filter(g).reduce((s,p)=>s+num(p.importe),0);
   const salariales=salBase+sumP(p=>p.cotiza!==false&&!p.l03&&!p.pagaExtra);   // cotizan este mes (la paga extra cobrada en su mes no: ya cotiza con la prorrata)
