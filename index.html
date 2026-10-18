@@ -241,11 +241,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
     <div class="modal-title" id="trTitle">Nuevo trabajador</div>
     <input type="hidden" id="tId">
     <div class="mg2">
-      <div class="fg"><label class="fl">Empresa *</label><select class="fi2" id="tEmp" onchange="tCvCatFill()"></select></div>
+      <div class="fg"><label class="fl">Empresa *</label><select class="fi2" id="tEmp" onchange="tCvSelFill();tCvCatFill()"></select></div>
       <div class="fg"><label class="fl">Nombre y apellidos *</label><input class="fi2" id="tNom"></div>
       <div class="fg"><label class="fl">DNI/NIE</label><input class="fi2" id="tDni"></div>
       <div class="fg"><label class="fl">NAF (nº afiliación SS)</label><input class="fi2" id="tNaf"></div>
       <div class="fg"><label class="fl">Categoría / convenio (texto de la nómina)</label><input class="fi2" id="tCat"></div>
+      <div class="fg"><label class="fl">Convenio del trabajador</label><select class="fi2" id="tCvSel" onchange="tCvCatFill()" title="Déjalo en «El de la empresa» salvo que este trabajador tenga otro convenio (empresas con dos convenios)"></select></div>
       <div class="fg"><label class="fl">Categoría en la tabla del convenio</label><select class="fi2" id="tCvCat" onchange="tCvRef()"></select><div id="tCvRef" style="font-size:11px;margin-top:3px;"></div></div>
       <div class="fg"><label class="fl">Grupo de cotización (1-11)</label><input type="number" class="fi2" id="tGrupo" value="9"></div>
       <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
@@ -272,7 +273,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:4px;">Cobro de las pagas extra (solo si NO van prorrateadas)</div>
       <div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">La app añade cada paga en su mes, proporcional a los días de alta dentro de su periodo de devengo. Tributa IRPF ese mes y no suma a la base (ya cotiza con la prorrata). Deja el mes vacío si no hay más pagas.</div>
       <div id="tPagasCfg"></div>
-      <button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="tCopiarPagasConv()">Copiar pagas del convenio de la empresa</button>
+      <button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="tCopiarPagasConv()">Copiar pagas del convenio</button>
     </div>
     <div id="tPrevAn" style="font-size:12px;color:var(--navy);background:#F1F5F9;border-radius:7px;padding:6px 10px;margin-top:6px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;">
@@ -439,7 +440,7 @@ function renderConvList(){
   const seed=document.getElementById("cvSeedBox");
   if(seed)seed.innerHTML=(window.WCV||[]).some(c=>c.id===CV_SEED.id)?"":"<button class='btn btn-secondary' onclick='cvSeed()'>+ Añadir el de aparcamientos y lavado de Cataluña (con tablas 2026)</button>";
   if(!L.length){box.innerHTML="<div class='empty' style='padding:20px;color:#888;'>Aún no hay convenios.</div>";return;}
-  const emps=c=>Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).length;
+  const emps=c=>new Set(Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.id).concat((window.WT||[]).filter(t=>t.convenioId===c.id).map(t=>t.empresaId))).size;
   box.innerHTML="<div class='tabla-wrapper'><table><thead><tr><th>Convenio</th><th>Código</th><th>Ámbito</th><th>Vigencia</th><th class='td-c'>Empresas</th><th class='td-c'>Documentos</th><th></th></tr></thead><tbody>"+
     L.map(c=>"<tr style='cursor:pointer;' onclick=\"cvAbrir('"+c.id+"')\"><td style='font-weight:600;'>"+cvEsc(c.nombre)+"</td><td style='font-family:monospace;font-size:12px;'>"+cvEsc(c.codigo)+"</td><td>"+cvEsc(c.ambito)+"</td><td style='font-size:12px;'>"+cvFecha(c.vigDesde)+" – "+cvFecha(c.vigHasta)+
       ((c.vigHasta&&c.vigHasta<new Date().toISOString().slice(0,10))?" <span style='color:#B45309;font-size:11px;'>(vencido: revisar prórroga)</span>":"")+"</td><td class='td-c'>"+emps(c)+"</td><td class='td-c'>"+((c.docs||[]).length||"—")+"</td><td><button class='btn btn-secondary btn-sm'>Abrir</button></td></tr>").join("")+"</tbody></table></div>";
@@ -476,7 +477,7 @@ function cvPintar(){
   (c.docs||[]).forEach((d,i)=>{if(!d.key)d.key=d.path||("ref"+i+"_"+Date.now());});
   const docs=(c.docs||[]).slice().sort((a,b)=>String(b.fechaPub||b.fecha).localeCompare(String(a.fechaPub||a.fecha))).map(d=>"<div style='display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed #e5e7eb;font-size:13px;'><span style='width:84px;color:#555;font-size:12px;'>"+cvFecha(d.fechaPub||d.fecha)+"</span><span style='flex:1;'>"+(d.path?"📄":"🔗")+" <b>"+cvEsc(d.desc||d.nombre)+"</b> <span style='color:#888;font-size:11px;'>"+(d.path?cvEsc(d.nombre)+(d.size?" · "+Math.round(d.size/1024)+" KB":""):"sin PDF")+"</span></span>"+
     (d.url?"<a class='btn btn-secondary btn-sm' href='"+cvEsc(d.url)+"' target='_blank' rel='noopener'>Boletín</a>":"")+(d.path?"<button class='btn btn-secondary btn-sm' onclick=\"cvDocAbrir('"+cvEsc(d.path)+"')\">Abrir</button>":"")+"<button class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick=\"cvDocBorrar('"+cvEsc(d.key)+"')\">✕</button></div>").join("")||"<div style='font-size:12px;color:#888;'>Sin documentos. Sube el PDF del convenio y de cada revisión.</div>";
-  const emp=Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.nombre||e.id);
+  const emp=[...new Set(Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.nombre||e.id).concat((window.WT||[]).filter(t=>t.convenioId===c.id).map(t=>((window.WE||{})[t.empresaId]||{}).nombre||t.empresaId)))];
   box.innerHTML="<div class='card' style='margin-top:14px;border:2px solid #C7D2FE;'>"+
     "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;'><h2 style='margin:0;'>"+(c.nombre?cvEsc(c.nombre):"Nuevo convenio")+"</h2><div style='display:flex;gap:6px;'><button class='btn btn-primary' onclick='cvGuardar()'>Guardar convenio</button><button class='btn btn-secondary' onclick='window._cv=null;cvPintar()'>Cerrar</button></div></div>"+
     (emp.length?"<div style='font-size:12px;color:#555;margin:4px 0 8px;'>Empresas con este convenio: <b>"+emp.map(cvEsc).join(", ")+"</b></div>":"<div style='font-size:12px;color:#888;margin:4px 0 8px;'>Ninguna empresa lo tiene asignado todavía (se asigna en Empresas).</div>")+
@@ -515,8 +516,8 @@ async function cvDocBorrar(key){
   c.docs=(c.docs||[]).filter(x=>x!==d);await fbSet("nom_convenios",c.id,c);cvPintar();
 }
 function tCopiarPagasConv(){
-  const emp=(window.WE||{})[document.getElementById("tEmp").value]||{};const c=(window.WCV||[]).find(x=>x.id===emp.convenioId);
-  if(!c){alert("La empresa no tiene convenio asignado (Empresas → Convenio).");return;}
+  const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));
+  if(!c){alert("Ni el trabajador ni su empresa tienen convenio asignado.");return;}
   renderPagasCfg(c.pagasCfg||[]);if(c.numPagas)document.getElementById("tNumPagas").value=c.numPagas;if(c.diasPaga)document.getElementById("tDiasPaga").value=c.diasPaga;
   if(document.getElementById("tProrrateadas").checked&&(c.pagasCfg||[]).length&&confirm("Las pagas están marcadas como prorrateadas. ¿Desmarcarlo para que se cobren en su mes?")){document.getElementById("tProrrateadas").checked=false;}
   tSalUI();
@@ -524,21 +525,25 @@ function tCopiarPagasConv(){
 Object.assign(window,{renderConvList,cvSeed,cvNuevo,cvAbrir,cvAddRev,cvAddTab,cvDelRow,cvPintar,cvGuardar,cvDocSubir,cvDocAbrir,cvDocBorrar,tCopiarPagasConv});
 
 // ---- Categoría del convenio en el trabajador ----
-function cvDeEmpresa(empId){const e=(window.WE||{})[empId]||{};return (window.WCV||[]).find(x=>x.id===e.convenioId)||null;}
+function cvDeEmpresa(empId,cvId){const e=(window.WE||{})[empId]||{};const id=cvId||e.convenioId;return (window.WCV||[]).find(x=>x.id===id)||null;}
+function cvDeTrab(t){return cvDeEmpresa(t.empresaId,t.convenioId);}
+function tCvSelFill(){const s=document.getElementById("tCvSel");if(!s)return;const cur=s.dataset.v!=null&&s.dataset.v!==""?s.dataset.v:s.value;const e=(window.WE||{})[val("tEmp")]||{};const ce=(window.WCV||[]).find(x=>x.id===e.convenioId);
+  s.innerHTML="<option value=''>El de la empresa"+(ce?" ("+cvEsc(ce.nombre).slice(0,40)+")":"")+"</option>"+(window.WCV||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(c=>"<option value='"+c.id+"'"+(c.id===cur?" selected":"")+">"+cvEsc(c.nombre)+"</option>").join("");}
+window.tCvSelFill=tCvSelFill;
 function cvUltAnio(c){const a=(c&&c.tablas||[]).map(t=>num(t.anio)).filter(Boolean);return a.length?Math.max(...a):0;}
 function cvFila(c,cat,anio){return (c&&c.tablas||[]).find(t=>t.categoria===cat&&num(t.anio)===num(anio))||null;}
 // salario que corresponde según tabla: importe × % jornada (los importes de la ficha del trabajador van ya proporcionales)
 function cvSalTabla(t,c,anio){const f=cvFila(c,t.cvCat,anio||cvUltAnio(c));if(!f)return null;const jor=(num(t.jornadaPct)||100)/100;
   return {fila:f,anio:num(f.anio),unidad:f.unidad,importe:num(f.importe),propuesto:f.unidad==="dia"?Math.round(num(f.importe)*jor*10000)/10000:r2(num(f.importe)*jor)};}
 function tCvCatFill(){
-  const s=document.getElementById("tCvCat");if(!s)return;const c=cvDeEmpresa(val("tEmp"));const cur=s.dataset.v||s.value;
+  const s=document.getElementById("tCvCat");if(!s)return;const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const cur=s.dataset.v||s.value;
   const an=cvUltAnio(c),cats=[...new Set((c&&c.tablas||[]).filter(t=>num(t.anio)===an).map(t=>t.categoria))];
   s.innerHTML="<option value=''>"+(c?"— sin vincular —":"(la empresa no tiene convenio con tablas)")+"</option>"+cats.map(x=>"<option"+(x===cur?" selected":"")+">"+cvEsc(x)+"</option>").join("");
   if(cur&&!cats.includes(cur))s.innerHTML+="<option selected>"+cvEsc(cur)+"</option>";
   tCvRef();
 }
 function tCvRef(){
-  const box=document.getElementById("tCvRef");if(!box)return;const c=cvDeEmpresa(val("tEmp"));const cat=val("tCvCat");
+  const box=document.getElementById("tCvRef");if(!box)return;const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const cat=val("tCvCat");
   if(!c||!cat){box.innerHTML="";return;}
   const t={cvCat:cat,jornadaPct:num(val("tJornada"))||100};const r=cvSalTabla(t,c);if(!r){box.innerHTML="<span style='color:#B45309;'>Esa categoría no está en la última tabla del convenio.</span>";return;}
   const actual=num(val("tSalBase")),diaria=val("tTipoSal")==="diario";
@@ -546,17 +551,16 @@ function tCvRef(){
   box.innerHTML="Tabla "+r.anio+": "+String(r.importe).replace(".",",")+" €/"+(r.unidad==="dia"?"día":"mes")+(t.jornadaPct<100?" × "+t.jornadaPct+" % = <b>"+String(r.propuesto).replace(".",",")+"</b>":"")+
     (ok?" <span style='color:#059669;font-weight:600;'>✓ coincide con el salario base</span>":" <span style='color:#B45309;font-weight:600;'>≠ salario base actual ("+String(actual).replace(".",",")+")</span> <button type='button' class='btn btn-secondary btn-sm' onclick='tCvAplicar()'>Aplicar</button>");
 }
-function tCvAplicar(){const c=cvDeEmpresa(val("tEmp"));const r=cvSalTabla({cvCat:val("tCvCat"),jornadaPct:num(val("tJornada"))||100},c);if(!r)return;
+function tCvAplicar(){const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const r=cvSalTabla({cvCat:val("tCvCat"),jornadaPct:num(val("tJornada"))||100},c);if(!r)return;
   document.getElementById("tTipoSal").value=r.unidad==="dia"?"diario":"mensual";document.getElementById("tSalBase").value=r.propuesto;tSalUI();tCvRef();}
 // ---- En la ficha del convenio: trabajadores afectados por la tabla nueva ----
 function cvAfectados(c){
   const an=cvUltAnio(c);if(!an)return [];
-  const emps=Object.values(window.WE||{}).filter(e=>e.convenioId===c.id).map(e=>e.id);
-  return (window.WT||[]).filter(t=>emps.includes(t.empresaId)&&t.cvCat&&!t.fechaBaja).map(t=>{const r=cvSalTabla(t,c,an);return {t,r,dif:r?(r.propuesto-num(t.salarioBase)):null};});
+  return (window.WT||[]).filter(t=>{const cv=cvDeTrab(t);return cv&&cv.id===c.id&&t.cvCat&&!t.fechaBaja;}).map(t=>{const r=cvSalTabla(t,c,an);return {t,r,dif:r?(r.propuesto-num(t.salarioBase)):null};});
 }
 function cvAfectadosHTML(c){
   const L=cvAfectados(c);const an=cvUltAnio(c);
-  const sinCat=(window.WT||[]).filter(t=>Object.values(window.WE||{}).some(e=>e.convenioId===c.id&&e.id===t.empresaId)&&!t.cvCat&&!t.fechaBaja).length;
+  const sinCat=(window.WT||[]).filter(t=>{const cv=cvDeTrab(t);return cv&&cv.id===c.id&&!t.cvCat&&!t.fechaBaja;}).length;
   if(!L.length)return "<div style='font-size:12px;color:#888;'>Ningún trabajador vinculado a una categoría"+(sinCat?" ("+sinCat+" sin vincular: elige su categoría en la ficha del trabajador)":"")+".</div>";
   return "<div class='tabla-wrapper'><table><thead><tr><th>Trabajador</th><th>Categoría</th><th class='td-r'>Salario actual</th><th class='td-r'>Tabla "+an+" × jornada</th><th class='td-r'>Diferencia</th><th></th></tr></thead><tbody>"+
     L.map(({t,r,dif})=>"<tr><td>"+cvEsc(t.nombre)+"</td><td style='font-size:12px;'>"+cvEsc(t.cvCat)+"</td><td class='td-r'>"+String(num(t.salarioBase)).replace(".",",")+"</td><td class='td-r'>"+(r?String(r.propuesto).replace(".",",")+" €/"+(r.unidad==="dia"?"día":"mes"):"<span style='color:#B45309;'>no está en la tabla</span>")+"</td><td class='td-r' style='font-weight:600;color:"+(r&&Math.abs(dif)>=0.005?"#B45309":"#059669")+";'>"+(r?(Math.abs(dif)<0.005?"✓":(dif>0?"+":"")+String(Math.round(dif*10000)/10000).replace(".",",")):"")+"</td><td>"+
@@ -691,7 +695,7 @@ function openTrab(id){
   document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
   window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
   renderPluses();renderPagasCfg(t&&Array.isArray(t.pagasCfg)?t.pagasCfg:[]);tSalUI();
-  {const s=document.getElementById("tCvCat");s.dataset.v=t&&t.cvCat||"";tCvCatFill();s.dataset.v="";}
+  {const sc=document.getElementById("tCvSel");sc.dataset.v=t&&t.convenioId||"";tCvSelFill();sc.dataset.v="";const s=document.getElementById("tCvCat");s.dataset.v=t&&t.cvCat||"";tCvCatFill();s.dataset.v="";}
   document.getElementById("tMsg").textContent="";
   document.getElementById("trModal").classList.add("open");
 }
@@ -704,7 +708,7 @@ async function saveTrab(){
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:normDni(val("tDni")),naf:val("tNaf"),unidades:((window.WT||[]).find(x=>x.id===id)||{}).unidades||{},
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
-    jornadaPct:num(val("tJornada"))||100,sinDesempleo:document.getElementById("tSinDes").checked,cvCat:val("tCvCat"),horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
+    jornadaPct:num(val("tJornada"))||100,sinDesempleo:document.getElementById("tSinDes").checked,cvCat:val("tCvCat"),convenioId:val("tCvSel"),horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pagasCfg:capturePagasCfg(),
     pagasAnual:val("tTipoSal")==="diario"?pagasAnualDiario({salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]}):num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
