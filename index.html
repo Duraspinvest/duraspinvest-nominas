@@ -671,11 +671,14 @@ function cvPlusesParse(t){return String(t||"").split("\n").map(l=>l.split(";").m
 function cvUltAnio(c){const a=(c&&c.tablas||[]).map(t=>num(t.anio)).filter(Boolean);return a.length?Math.max(...a):0;}
 function cvFila(c,cat,anio){const L=(c&&c.tablas||[]).filter(t=>num(t.anio)===num(anio));return L.find(t=>cvKey(t)===cat)||L.find(t=>!t.sector&&t.categoria===cat)||null;}
 // salario que corresponde según tabla: importe × % jornada (los importes de la ficha del trabajador van ya proporcionales)
-function cvSalTabla(t,c,anio){const f=cvFila(c,t.cvCat,anio||cvUltAnio(c));if(!f)return null;const jor=(num(t.jornadaPct)||100)/100;
+// último año con tabla para esa categoría (cada sector puede tener su última tabla en un año distinto)
+function cvUltAnioCat(c,cat){const a=(c&&c.tablas||[]).filter(t=>cvKey(t)===cat||(!t.sector&&t.categoria===cat)).map(t=>num(t.anio)).filter(Boolean);return a.length?Math.max(...a):cvUltAnio(c);}
+function cvSalTabla(t,c,anio){const f=cvFila(c,t.cvCat,anio||cvUltAnioCat(c,t.cvCat));if(!f)return null;const jor=(num(t.jornadaPct)||100)/100;
   return {fila:f,anio:num(f.anio),unidad:f.unidad,importe:num(f.importe),propuesto:f.unidad==="dia"?Math.round(num(f.importe)*jor*10000)/10000:r2(num(f.importe)*jor)};}
 function tCvCatFill(){
   const s=document.getElementById("tCvCat");if(!s)return;const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const cur=s.dataset.v||s.value;
-  const an=cvUltAnio(c),filas=(c&&c.tablas||[]).filter(t=>num(t.anio)===an),cats=[...new Set(filas.map(cvKey))];
+  const T=(c&&c.tablas||[]),ultSec={};T.forEach(t=>{const k=t.sector||"";ultSec[k]=Math.max(ultSec[k]||0,num(t.anio));});
+  const filas=T.filter(t=>num(t.anio)===ultSec[t.sector||""]),cats=[...new Set(filas.map(cvKey))];
   const secs=[...new Set(filas.map(t=>t.sector||""))].sort((a,b)=>a.localeCompare(b,"es",{numeric:true}));
   const opt=t=>"<option value=\""+cvEsc(cvKey(t))+"\""+(cvKey(t)===cur?" selected":"")+">"+cvEsc(t.categoria)+"</option>";
   const vistos=new Set(),uniq=L=>L.filter(t=>{const k=cvKey(t);if(vistos.has(k))return false;vistos.add(k);return true;});
@@ -709,7 +712,7 @@ function tCvAplicar(){const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const r=cvS
 // ---- En la ficha del convenio: trabajadores afectados por la tabla nueva ----
 function cvAfectados(c){
   const an=cvUltAnio(c);if(!an)return [];
-  return (window.WT||[]).filter(t=>{const cv=cvDeTrab(t);return cv&&cv.id===c.id&&t.cvCat&&!t.fechaBaja;}).map(t=>{const r=cvSalTabla(t,c,an);return {t,r,dif:r?(r.propuesto-num(t.salarioBase)):null};});
+  return (window.WT||[]).filter(t=>{const cv=cvDeTrab(t);return cv&&cv.id===c.id&&t.cvCat&&!t.fechaBaja;}).map(t=>{const r=cvSalTabla(t,c);return {t,r,dif:r?(r.propuesto-num(t.salarioBase)):null};});
 }
 function cvAfectadosHTML(c){
   const L=cvAfectados(c);const an=cvUltAnio(c);
