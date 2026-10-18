@@ -183,8 +183,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
   <!-- SEGUROS SOCIALES -->
   <div id="ss" class="section">
     <div class="card">
-      <h2>Seguros sociales (RLC) por empresa</h2>
-      <div class="sub">Resumen mensual de bases y cuotas de todos los trabajadores de la empresa, como el recibo de liquidación para el Sistema RED.</div>
+      <h2>Seguros sociales: borrador RLC, RNT y CRA</h2>
+      <div class="sub">Borrador mensual por empresa (trabajadores de alta ese mes): recibo de liquidación (RLC), relación nominal (RNT) y conceptos retributivos (CRA). Para revisar e imprimir antes de enviar por SILTRA.</div>
       <div class="filtros">
         <div class="fg"><span class="fl">Empresa</span><select class="fi" id="sEmp"><option value="">Seleccionar...</option></select></div>
         <div class="fg"><span class="fl">Mes</span><select class="fi" id="sMes"></select></div>
@@ -247,10 +247,14 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
     </div>
     <div style="font-weight:600;color:var(--navy);margin:14px 0 6px;font-size:13px;">Devengos y pagas</div>
     <div class="mg3">
-      <div class="fg"><label class="fl">Salario base mensual</label><input type="number" step="0.01" class="fi2" id="tSalBase" value="0"></div>
-      <div class="fg"><label class="fl">Importe ANUAL de pagas extra</label><input type="number" step="0.01" class="fi2" id="tPagasAnual" value="0"></div>
+      <div class="fg"><label class="fl">Tipo de salario</label><select class="fi2" id="tTipoSal" onchange="tSalUI()"><option value="mensual">Mensual</option><option value="diario">Diario (€/día × días naturales)</option></select></div>
+      <div class="fg"><label class="fl" id="tSalBaseLbl">Salario base mensual</label><input type="number" step="0.01" class="fi2" id="tSalBase" value="0" oninput="tPrev()"></div>
+      <div class="fg" id="tPagasAnualG"><label class="fl">Importe ANUAL de pagas extra</label><input type="number" step="0.01" class="fi2" id="tPagasAnual" value="0" oninput="tPrev()"></div>
+      <div class="fg tDiaG" style="display:none;"><label class="fl">Nº de pagas extra</label><input type="number" step="1" class="fi2" id="tNumPagas" value="2" oninput="tPrev()"></div>
+      <div class="fg tDiaG" style="display:none;"><label class="fl">Días por paga</label><input type="number" step="1" class="fi2" id="tDiasPaga" value="30" oninput="tPrev()"></div>
       <div class="fg"><label class="fl">&nbsp;</label><label style="display:flex;align-items:center;gap:7px;font-size:13px;height:38px;"><input type="checkbox" id="tProrrateadas" style="width:16px;height:16px;"> Pagas prorrateadas</label></div>
     </div>
+    <div id="tPrevAn" style="font-size:12px;color:var(--navy);background:#F1F5F9;border-radius:7px;padding:6px 10px;margin-top:6px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;">
       <span style="font-weight:600;color:var(--navy);font-size:13px;">Pluses (del convenio)</span>
       <button type="button" class="btn btn-secondary btn-sm" onclick="addPlus()">+ Añadir plus</button>
@@ -303,7 +307,7 @@ const R={trabCC:4.70,trabDesInd:1.55,trabDesTemp:1.60,trabFP:0.10,trabMEI:0.15,
          empCC:23.60,empDesInd:5.50,empDesTemp:6.70,empFP:0.60,empFOG:0.20,empMEI:0.75};
 const TOPE_MAX=5101.20; // base máxima mensual 2026 (Orden PJC/297/2026)
 // Bases mínimas 2026 por grupo de cotización: mensual (jornada completa) y por hora (tiempo parcial)
-const BMIN_MES={1:1989.30,2:1649.70,3:1435.20}, BMIN_MES_RESTO=1424.40;
+const BMIN_MES={1:1989.30,2:1649.70,3:1435.20}, BMIN_MES_RESTO=1424.40, BMIN_DIA_8_11=47.48;
 const BMIN_HORA={1:11.98,2:9.94,3:8.65}, BMIN_HORA_RESTO=8.58;
 const ANIO=2026;
 // Días y horas del periodo: tiene en cuenta altas/bajas dentro del mes
@@ -328,6 +332,7 @@ function periodoTrab(t,mi,horasOverride){
 function baseMinima(t,P){
   const g=parseInt(t.grupoCot,10); if(!g)return 0;
   if(P.parcial)return r2(P.horas*(BMIN_HORA[g]||BMIN_HORA_RESTO));
+  if(g>=8)return r2(BMIN_DIA_8_11*P.diasNat);      // grupos 8-11: base mínima diaria × días naturales
   return r2((BMIN_MES[g]||BMIN_MES_RESTO)*P.dias/30);
 }
 const num=v=>parseFloat(v)||0;
@@ -391,11 +396,40 @@ function renderTrab(){
 }
 window.renderTrab=renderTrab;
 function fillTEmp(sel){const s=document.getElementById("tEmp");const cs=(window.WC||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));s.innerHTML="<option value=''>Seleccionar...</option>"+cs.map(c=>"<option value='"+c.id+"'"+(c.id===sel?" selected":"")+">"+(c.nombre||c.id)+"</option>").join("");}
+// Salario diario: importe anual de pagas = nº pagas × días por paga × (base/día + pluses €/día que cotizan y entran en pagas)
+function pagasAnualDiario(t){
+  const pd=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>p.unidad==="dia"&&p.cotiza!==false&&!p.l03&&!num(p.mes)&&p.enPagas!==false).reduce((a,p)=>a+num(p.importe),0);
+  return r2(num(t.numPagas)*num(t.diasPaga)*(num(t.salarioBase)+pd));
+}
+function tSalUI(){
+  const d=(document.getElementById("tTipoSal")||{}).value==="diario";
+  const sb=document.getElementById("tSalBase");if(!sb)return;
+  document.getElementById("tSalBaseLbl").textContent=d?"Salario base (€/día)":"Salario base mensual";sb.step=d?"0.0001":"0.01";
+  document.getElementById("tPagasAnualG").style.display=d?"none":"";
+  document.querySelectorAll(".tDiaG").forEach(x=>x.style.display=d?"":"none");
+  tPrev();
+}
+// Previsión de retribución anual (orientativa, para fijar el % de IRPF)
+function tPrev(){
+  const box=document.getElementById("tPrevAn");if(!box)return;
+  capturePluses();
+  const d=(document.getElementById("tTipoSal")||{}).value==="diario";
+  const t={salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]};
+  const fa=parseFecha(val("tAlta")||val("tAnt")),ini=(fa&&fa.getFullYear()===ANIO)?fa:new Date(ANIO,0,1);
+  const dias=Math.round((new Date(ANIO,11,31)-ini)/86400000)+1,diasAn=Math.round((new Date(ANIO,11,31)-new Date(ANIO,0,1))/86400000)+1;
+  const pl=t.pluses.filter(p=>!p.l03),plD=pl.filter(p=>p.unidad==="dia"&&!num(p.mes)).reduce((a,p)=>a+num(p.importe),0);
+  const plM=pl.filter(p=>p.unidad!=="dia"&&!num(p.mes)).reduce((a,p)=>a+num(p.importe),0),plU=pl.filter(p=>num(p.mes)).reduce((a,p)=>a+num(p.importe),0);
+  const pagas=(d?pagasAnualDiario(t):num(val("tPagasAnual")))*dias/diasAn;
+  const anual=(d?(t.salarioBase+plD)*dias:t.salarioBase*12*dias/diasAn)+plM*12*dias/diasAn+plU+pagas;
+  box.innerHTML="Retribución anual prevista "+ANIO+(dias<diasAn?" (desde el alta, "+dias+" días)":"")+": <b>"+eur(anual)+"</b>"+(d?" &nbsp;·&nbsp; pagas extra: <b>"+eur(pagasAnualDiario(t))+"</b>/año ("+eur(pagasAnualDiario(t)/12)+"/mes prorrateado)":"")+" &nbsp;<span style='color:var(--gray-400);'>Orientativo para fijar el % de IRPF.</span>";
+}
+window.tSalUI=tSalUI;window.tPrev=tPrev;
 function capturePluses(){
   window._pluses=[].map.call(document.querySelectorAll("#tPluses .plusrow"),row=>({
     nombre:row.querySelector(".pn").value.trim(),importe:num(row.querySelector(".pi").value),
     cotiza:row.querySelector(".pc").checked,irpf:row.querySelector(".pr").checked,
     mes:num(row.querySelector(".pm").value)||"",l03:row.querySelector(".pl").checked,
+    unidad:row.querySelector(".pu").value==="dia"?"dia":"mes",enPagas:row.querySelector(".pp").checked,
     baseL03:(row.querySelector(".pb").value===""?"":num(row.querySelector(".pb").value))}));
 }
 function renderPluses(){
@@ -403,7 +437,9 @@ function renderPluses(){
   const pl=window._pluses||[];
   c.innerHTML=pl.length?pl.map((p,i)=>"<div class='plusrow' style='display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed #e5e7eb;'>"+
     "<input class='pn fi2' style='flex:1 1 100%;' placeholder='Concepto (p.ej. Plus convenio)' value=\""+(p.nombre||"").replace(/\"/g,'&quot;')+"\">"+
-    "<input class='pi fi2' style='flex:1;min-width:80px;' type='number' step='0.01' placeholder='€/mes' value='"+(p.importe!=null?p.importe:"")+"'>"+
+    "<input class='pi fi2' style='flex:1;min-width:80px;' type='number' step='0.0001' placeholder='importe' oninput='tPrev()' value='"+(p.importe!=null?p.importe:"")+"'>"+
+    "<select class='pu fi2' style='width:auto;font-size:11px;' onchange='tPrev()'><option value='mes'"+(p.unidad==="dia"?"":" selected")+">€/mes</option><option value='dia'"+(p.unidad==="dia"?" selected":"")+">€/día</option></select>"+
+    "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;' title='Salario diario: el plus entra en el importe de cada paga extra (días por paga × €/día)'><input class='pp' type='checkbox' onchange='tPrev()' "+(p.enPagas!==false?"checked":"")+"> en pagas</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pc' type='checkbox' "+(p.cotiza!==false?"checked":"")+"> cotiza</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pr' type='checkbox' "+(p.irpf!==false?"checked":"")+"> IRPF</label>"+
     "<select class='pm fi2' style='width:auto;font-size:11px;' title='Mes en que se paga (vacío = todos los meses)'><option value=''>Todos los meses</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(p.mes)===k+1?" selected":"")+">Solo "+m.toLowerCase()+"</option>").join("")+"</select>"+
@@ -427,9 +463,10 @@ function openTrab(id){
   set("tJornada",t?t.jornadaPct||100:100);set("tHorasSem",t&&t.horasSemana?t.horasSemana:"");
   {const ds=(t&&Array.isArray(t.diasSemana)&&t.diasSemana.length)?t.diasSemana.map(Number):[1,2,3,4,5];document.querySelectorAll("#tDias input").forEach(c=>c.checked=ds.includes(Number(c.value)));}set("tIrpf",t?t.irpfPct||0:0);
   set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
+  set("tTipoSal",t&&t.tipoSalario==="diario"?"diario":"mensual");set("tNumPagas",t&&t.numPagas!=null&&t.numPagas!==""?t.numPagas:2);set("tDiasPaga",t&&t.diasPaga?t.diasPaga:30);
   document.getElementById("tProrrateadas").checked=t?!!t.pagasProrrateadas:true;
   window._pluses=(t&&Array.isArray(t.pluses))?JSON.parse(JSON.stringify(t.pluses)):[];
-  renderPluses();
+  renderPluses();tSalUI();
   document.getElementById("tMsg").textContent="";
   document.getElementById("trModal").classList.add("open");
 }
@@ -443,7 +480,8 @@ async function saveTrab(){
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:val("tDni"),naf:val("tNaf"),
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
     jornadaPct:num(val("tJornada"))||100,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
-    salarioBase:num(val("tSalBase")),pagasAnual:num(val("tPagasAnual")),
+    salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),
+    pagasAnual:val("tTipoSal")==="diario"?pagasAnualDiario({salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]}):num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
   if(editando){closeM("trModal");return;}
   ["tNom","tDni","tNaf","tCat"].forEach(x=>document.getElementById(x).value="");
@@ -462,23 +500,27 @@ window.closeM=closeM;
 function calc(t,emp,mi,horasOverride){
   mi=mi||num((document.getElementById("nMes")||{}).value)||1;
   const P=periodoTrab(t,mi,horasOverride), f=P.dias/30;
+  const diario=t.tipoSalario==="diario";
   const pl=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!num(p.mes)||num(p.mes)===mi)
-    .map(p=>({...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):r2(num(p.importe)*f)}));
-  const salBase=r2(num(t.salarioBase)*f);
+    .map(p=>({...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):(p.unidad==="dia"?r2(num(p.importe)*P.diasNat):r2(num(p.importe)*f))}));
+  const salBase=diario?r2(num(t.salarioBase)*P.diasNat):r2(num(t.salarioBase)*f);
   const sumP=g=>pl.filter(g).reduce((s,p)=>s+num(p.importe),0);
   const salariales=salBase+sumP(p=>p.cotiza!==false&&!p.l03);   // cotizan este mes
   const atrasosL03=r2(sumP(p=>p.l03));
   const baseAtrL03=r2(pl.filter(p=>p.l03).reduce((a,p)=>a+(p.baseL03!==""&&p.baseL03!=null?num(p.baseL03):num(p.importe)),0));
   const noCotiza=sumP(p=>p.cotiza===false&&!p.l03);
   const irpfMens=salBase+sumP(p=>p.irpf!==false);
-  const prorrata=r2(num(t.pagasAnual)/12*f);
+  const pagasAn=diario?pagasAnualDiario(t):num(t.pagasAnual);
+  const prorrata=diario?(P.completo?r2(pagasAn/12):r2(pagasAn/12*P.diasNat/P.dm)):r2(pagasAn/12*f);
   const prorra=t.pagasProrrateadas?prorrata:0;
   const devengo=r2(salBase+pl.reduce((s,p)=>s+num(p.importe),0)+prorra);
   const baseReal=r2(salariales+prorrata);
   const admin=t.tipoPerceptor==="administrador";
   const bmin=admin?0:baseMinima(t,P);
   let baseCC=Math.max(baseReal,bmin);
-  if(baseCC>TOPE_MAX)baseCC=TOPE_MAX;
+  const gC=parseInt(t.grupoCot,10)||0;
+  const tope=gC>=8?r2(TOPE_MAX/30*P.diasNat):(P.completo?TOPE_MAX:r2(TOPE_MAX*P.dias/30)); // grupos 8-11: tope diario × días naturales; resto: mensual (proporcional si el mes está incompleto)
+  if(baseCC>tope)baseCC=tope;
   if(admin)baseCC=0;
   baseCC=r2(baseCC);
   const baseIRPF=r2(irpfMens+prorra);
@@ -535,8 +577,9 @@ function nominaHTML(t,mi){
   const rline=(l,a)=>"<tr><td>"+l+"</td><td class='amt'>"+a+"</td></tr>";
   const pline=(l,p,a)=>"<tr><td>"+l+"</td><td class='pct'>"+p+"</td><td class='amt'>"+a+"</td></tr>";
   // ---- I. DEVENGOS ----
-  const devSal=rline("Salario base"+(P.completo?"":" ("+P.dias+" días)"),eur(c.salBase))
-     +salP.map(p=>rline(p.nombre||"Plus",eur(p.importe))).join("")
+  const dTxt=v=>" ("+P.diasNat+" días × "+String(num(v).toFixed(4)).replace(".",",")+" €)";
+  const devSal=rline("Salario base"+(t.tipoSalario==="diario"?dTxt(t.salarioBase):(P.completo?"":" ("+P.dias+" días)")),eur(c.salBase))
+     +salP.map(p=>{const o=(t.pluses||[]).find(x=>x.nombre===p.nombre&&x.unidad==="dia");return rline((p.nombre||"Plus")+(o&&!num(o.mes)&&!o.l03?dTxt(o.importe):""),eur(p.importe));}).join("")
      +(c.prorra>0?rline("P.P. gratificaciones extraordinarias",eur(c.prorra)):"");
   const devNoSal=nosalP.length?nosalP.map(p=>rline(p.nombre||"Percepción",eur(p.importe))).join(""):"<tr><td colspan='2' style='color:#888;'>—</td></tr>";
   const devengos="<table>"
@@ -730,7 +773,10 @@ function calcFiniquito(){
   const motivo=document.getElementById("fMotivo").value;
   const c=calc({...t,antiguedad:"",fechaAlta:"",fechaBaja:""},emp,1); // mes completo de referencia
   const temp=t.tipoContrato==="temporal";
-  const valorDia=r2(c.devengo/30);                                    // salario/dia con prorrata de pagas
+  const plDia=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!p.l03&&!num(p.mes));
+  const valorDia=t.tipoSalario==="diario"
+    ? r2(num(t.salarioBase)+plDia.filter(p=>p.unidad==="dia").reduce((a,p)=>a+num(p.importe),0)+plDia.filter(p=>p.unidad!=="dia").reduce((a,p)=>a+num(p.importe),0)/30+(t.pagasProrrateadas?pagasAnualDiario(t)/365:0))
+    : r2(c.devengo/30);                                                // salario/dia con prorrata de pagas
   // dias trabajados del mes de baja (por defecto, del 1 al dia de la baja)
   const diasMesRaw=document.getElementById("fDiasMes").value;
   const diasMes=(diasMesRaw!==""&&diasMesRaw!=null)?num(diasMesRaw):baja.getDate();
@@ -746,7 +792,7 @@ function calcFiniquito(){
   const vacPend=Math.max(0,vacDeveng-vacDisf);
   const impVac=r2(valorDia*vacPend);
   // pagas extras pendientes (solo si NO estan prorrateadas)
-  const pagaExtra=t.pagasProrrateadas?0:r2(num(t.pagasAnual)*diasAlta/diasAnio);
+  const pagaExtra=t.pagasProrrateadas?0:r2((t.tipoSalario==="diario"?pagasAnualDiario(t):num(t.pagasAnual))*diasAlta/diasAnio);
   // indemnizacion (exenta de IRPF y no cotiza dentro de limites)
   const anosServicio=diasEntre(alta,baja)/365;
   const indRaw=document.getElementById("fIndem").value;
@@ -794,35 +840,44 @@ function calcSS(){
   const emp=document.getElementById("sEmp").value, cont=document.getElementById("sRes");
   if(!emp){cont.innerHTML="<div class='warn'>Selecciona una empresa.</div>";return;}
   const e=(window.WE||{})[emp]||{};
-  const ts=(window.WT||[]).filter(t=>t.empresaId===emp&&t.tipoPerceptor!=="administrador");
-  if(!ts.length){cont.innerHTML="<div class='warn'>Esta empresa no tiene trabajadores.</div>";return;}
-  const mes=MESES[num(document.getElementById("sMes").value)-1]||"";
-  let baseTotal=0, filas="";
-  const smi=num(document.getElementById("sMes").value)||1;
-  ts.forEach(t=>{const c=calc(t,e,smi);baseTotal+=c.baseCC;
-    filas+="<tr><td>"+t.nombre+"</td><td class='td-r'>"+eur(c.baseCC)+"</td><td class='td-r'>"+eur(c.cotTrab)+"</td><td class='td-r'>"+eur(c.cotEmp)+"</td></tr>";});
-  baseTotal=r2(baseTotal);
+  const smi=num(document.getElementById("sMes").value)||1, mes=MESES[smi-1]||"";
+  const ts=(window.WT||[]).filter(t=>t.empresaId===emp&&t.tipoPerceptor!=="administrador"&&periodoTrab(t,smi).diasNat>0).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  if(!ts.length){cont.innerHTML="<div class='warn'>Esta empresa no tiene trabajadores de alta en "+mes+".</div>";return;}
   const it=num(e.atepIT),ims=num(e.atepIMS);
-  const cc=r2(baseTotal*(R.empCC+R.trabCC)/100);
-  const mei=r2(baseTotal*(R.empMEI+R.trabMEI)/100);
-  const atep=r2(baseTotal*(it+ims)/100);
-  // otras: desempleo (emp+trab) + FP (emp+trab) + FOGASA. Asumimos indefinido salvo temporales.
-  let otras=0; ts.forEach(t=>{const temp=t.tipoContrato==="temporal";const c=calc(t,e,smi);
-    otras+=c.baseCC*((temp?R.empDesTemp:R.empDesInd)+(temp?R.trabDesTemp:R.trabDesInd)+R.empFP+R.trabFP+R.empFOG)/100;});
-  otras=r2(otras);
-  const total=r2(cc+mei+atep+otras);
-  cont.innerHTML="<div class='sub' style='margin-top:6px;'>"+empNombre(emp)+" · "+mes+" 2026 · "+ts.length+" trabajador(es)</div>"+
-   "<div class='tabla-wrapper' style='margin-bottom:14px;'><table><thead><tr><th>Trabajador</th><th class='td-r'>Base cotización</th><th class='td-r'>Cuota trabajador</th><th class='td-r'>Coste empresa</th></tr></thead><tbody>"+filas+
-   "<tr style='font-weight:700;border-top:2px solid var(--gray-200);'><td>TOTAL BASES</td><td class='td-r'>"+eur(baseTotal)+"</td><td></td><td></td></tr></tbody></table></div>"+
-   "<div class='recibo' style='max-width:520px;'>"+
-   "<div style='font-weight:700;'>Recibo de Liquidación (RLC) — a ingresar</div>"+
-   "<div class='rl'><span>Contingencias comunes (28,30%)</span><span>"+eur(cc)+"</span></div>"+
-   "<div class='rl'><span>MEI (0,90%)</span><span>"+eur(mei)+"</span></div>"+
-   "<div class='rl'><span>AT/EP ("+(it+ims).toFixed(2)+"%)</span><span>"+eur(atep)+"</span></div>"+
-   "<div class='rl'><span>Otras cotizaciones (desempleo+FP+FOGASA)</span><span>"+eur(otras)+"</span></div>"+
-   "<div class='rl tot' style='font-size:15px;'><span>TOTAL A INGRESAR</span><span>"+eur(total)+"</span></div>"+
-   "</div>"+
-   ((!it&&!ims)?"<div class='warn'>Falta configurar el AT/EP de esta empresa (en «Empresas»).</div>":"");
+  const W=ts.map(t=>({t,c:calc(t,e,smi),temp:t.tipoContrato==="temporal"}));
+  const S=(f)=>r2(W.reduce((a,w)=>a+f(w),0));
+  const pc=v=>String(v.toFixed(2)).replace(".",",")+" %";
+  const th="style='background:#1F3864;color:#fff;padding:4px 6px;font-size:11px;text-align:left;'", td="style='padding:3px 6px;border-bottom:1px solid #ddd;font-size:11.5px;'", tdr="style='padding:3px 6px;border-bottom:1px solid #ddd;font-size:11.5px;text-align:right;white-space:nowrap;'";
+  // ---- RNT ----
+  const rnt="<table style='width:100%;border-collapse:collapse;'><thead><tr><th "+th+">NAF</th><th "+th+">IPF</th><th "+th+">Trabajador</th><th "+th+">Contrato</th><th "+th+">Grupo</th><th "+th+">Días</th><th "+th+">Jornada</th><th "+th+">Base CC</th><th "+th+">Base AT/EP y desempleo</th><th "+th+">Cuota trab.</th><th "+th+">Cuota empresa</th></tr></thead><tbody>"+
+    W.map(({t,c,temp})=>"<tr><td "+td+">"+(t.naf||"<span style='color:#B91C1C'>falta</span>")+"</td><td "+td+">"+(t.dni||"")+"</td><td "+td+">"+t.nombre+(c.minAplicada?" <span style='font-size:9px;color:#B45309;'>(base mínima)</span>":"")+"</td><td "+td+">"+(temp?"Temporal":"Indefinido")+"</td><td "+td+">"+(t.grupoCot||"")+"</td><td "+td+">"+c.P.diasNat+(c.P.completo?"":" ("+String(c.P.d1).padStart(2,"0")+"-"+String(c.P.d2).padStart(2,"0")+")")+"</td><td "+td+">"+(c.P.parcial?num(t.jornadaPct)+" % · "+String(c.P.horas).replace(".",",")+" h":"Completa")+"</td><td "+tdr+">"+eur(c.baseCC)+"</td><td "+tdr+">"+eur(c.baseCC)+"</td><td "+tdr+">"+eur(c.cotTrab)+"</td><td "+tdr+">"+eur(c.cotEmp)+"</td></tr>").join("")+
+    "<tr style='font-weight:700;'><td "+td+" colspan='7'>TOTAL "+W.length+" trabajador(es)</td><td "+tdr+">"+eur(S(w=>w.c.baseCC))+"</td><td "+tdr+">"+eur(S(w=>w.c.baseCC))+"</td><td "+tdr+">"+eur(S(w=>w.c.cotTrab))+"</td><td "+tdr+">"+eur(S(w=>w.c.cotEmp))+"</td></tr></tbody></table>";
+  // ---- RLC ----
+  const ind=W.filter(w=>!w.temp),tmp=W.filter(w=>w.temp);
+  const bTot=S(w=>w.c.baseCC),bInd=r2(ind.reduce((a,w)=>a+w.c.baseCC,0)),bTmp=r2(tmp.reduce((a,w)=>a+w.c.baseCC,0));
+  const L=[["Contingencias comunes",bTot,R.empCC,R.trabCC,S(w=>w.c.eCC),S(w=>w.c.cc)],
+    ["Mecanismo de Equidad Intergeneracional (MEI)",bTot,R.empMEI,R.trabMEI,S(w=>w.c.eMEI),S(w=>w.c.mei)],
+    ["AT y EP (IT "+String(it).replace(".",",")+" + IMS "+String(ims).replace(".",",")+")",bTot,it+ims,0,S(w=>w.c.eAT),0]];
+  if(bInd)L.push(["Desempleo · contratos indefinidos",bInd,R.empDesInd,R.trabDesInd,r2(ind.reduce((a,w)=>a+w.c.eDes,0)),r2(ind.reduce((a,w)=>a+w.c.des,0))]);
+  if(bTmp)L.push(["Desempleo · contratos temporales",bTmp,R.empDesTemp,R.trabDesTemp,r2(tmp.reduce((a,w)=>a+w.c.eDes,0)),r2(tmp.reduce((a,w)=>a+w.c.des,0))]);
+  L.push(["Fondo de Garantía Salarial",bTot,R.empFOG,0,S(w=>w.c.eFOG),0],["Formación profesional",bTot,R.empFP,R.trabFP,S(w=>w.c.eFP),S(w=>w.c.fp)]);
+  const tE=r2(L.reduce((a,l)=>a+l[4],0)),tT=r2(L.reduce((a,l)=>a+l[5],0));
+  const rlc="<table style='width:100%;border-collapse:collapse;'><thead><tr><th "+th+">Concepto</th><th "+th+">Base</th><th "+th+">% empresa</th><th "+th+">% trabajador</th><th "+th+">Empresa</th><th "+th+">Trabajador</th><th "+th+">Total</th></tr></thead><tbody>"+
+    L.map(l=>"<tr><td "+td+">"+l[0]+"</td><td "+tdr+">"+eur(l[1])+"</td><td "+tdr+">"+pc(l[2])+"</td><td "+tdr+">"+(l[3]?pc(l[3]):"—")+"</td><td "+tdr+">"+eur(l[4])+"</td><td "+tdr+">"+(l[5]?eur(l[5]):"—")+"</td><td "+tdr+">"+eur(r2(l[4]+l[5]))+"</td></tr>").join("")+
+    "<tr style='font-weight:700;font-size:13px;'><td "+td+" colspan='4'>TOTAL LIQUIDACIÓN (a ingresar)</td><td "+tdr+">"+eur(tE)+"</td><td "+tdr+">"+eur(tT)+"</td><td "+tdr+">"+eur(r2(tE+tT))+"</td></tr></tbody></table>";
+  // ---- CRA ----
+  const cra="<table style='width:100%;border-collapse:collapse;'><thead><tr><th "+th+">Trabajador</th><th "+th+">Concepto</th><th "+th+">Importe</th><th "+th+">Cotiza</th><th "+th+">Tributa IRPF</th><th "+th+">Código CRA</th></tr></thead><tbody>"+
+    W.map(({t,c})=>{const rows=[["Salario base",c.salBase,true,true]].concat((c.pl||[]).map(p=>[(p.nombre||"Plus")+(p.l03?" (atrasos L03)":""),num(p.importe),p.cotiza!==false,p.irpf!==false]));
+      if(c.prorra)rows.push(["P.P. pagas extraordinarias",c.prorra,true,true]);
+      return rows.filter(r=>r[1]).map((r,i)=>"<tr><td "+td+">"+(i?"":t.nombre)+"</td><td "+td+">"+r[0]+"</td><td "+tdr+">"+eur(r[1])+"</td><td "+td+">"+(r[2]?"Sí":"No")+"</td><td "+td+">"+(r[3]?"Sí":"No")+"</td><td "+td+" style='color:#999'>____</td></tr>").join("");}).join("")+
+    "</tbody></table><div style='font-size:10.5px;color:#666;margin-top:4px;'>El código de cada concepto (tabla CRA de la TGSS) se asigna en SILTRA la primera vez; esta lista sirve para comprobar importes.</div>";
+  const titulo=e.nombre||empNombre(emp);
+  const H=(t)=>"<h3 style='font-size:13px;color:#1F3864;margin:16px 0 6px;border-bottom:2px solid #1F3864;padding-bottom:3px;'>"+t+"</h3>";
+  const html="<div style='font-family:Arial,sans-serif;'><div style='display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px;'><div><div style='font-size:16px;font-weight:700;'>"+titulo+"</div><div style='font-size:12px;'>"+(e.cif?"CIF/NIF "+e.cif+" · ":"")+"C.C.C. "+(e.ccc||"—")+"</div></div><div style='text-align:right;font-size:12px;'><b>Liquidación de "+mes+" 2026</b><br><span style='color:#B45309;'>BORRADOR · comprobar con el cálculo de SILTRA</span></div></div>"+
+    H("RLC · Recibo de liquidación de cotizaciones")+rlc+H("RNT · Relación nominal de trabajadores")+rnt+H("CRA · Conceptos retributivos abonados")+cra+"</div>";
+  cont.innerHTML="<div class='no-print' style='margin:8px 0;'><button class='btn btn-gold' onclick='window.print()'>Imprimir / Guardar PDF</button></div><div id='printArea'>"+html+"</div>"+
+    ((!it&&!ims)?"<div class='warn no-print'>Falta configurar el AT/EP de esta empresa (en «Empresas»).</div>":"")+
+    (W.some(w=>!w.t.naf)?"<div class='warn no-print'>Hay trabajadores sin Nº de afiliación (NAF) en su ficha.</div>":"");
 }
 window.calcSS=calcSS;
 
