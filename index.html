@@ -250,6 +250,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
       <div class="fg"><label class="fl">Fecha de antigüedad</label><input type="date" class="fi2" id="tAnt"></div>
       <div class="fg"><label class="fl">Fecha de alta</label><input type="date" class="fi2" id="tAlta" title="Vacía = la de antigüedad. Si entra a mitad de mes, la nómina sale proporcional"></div>
       <div class="fg"><label class="fl">Fecha de baja</label><input type="date" class="fi2" id="tBaja" title="Último día trabajado (despido, baja voluntaria, fin de contrato…). La nómina de ese mes sale proporcional y deja de salir en los meses siguientes"></div>
+      <div class="fg"><label class="fl">&nbsp;</label><label style="display:flex;align-items:center;gap:7px;font-size:12px;min-height:38px;" title="Hijo/a menor de 30 años que convive con el autónomo que le contrata (DA 10ª Ley 20/2007 del Estatuto del Trabajo Autónomo) y otros casos excluidos de la protección por desempleo: no cotiza desempleo (trabajador ni empresa); el resto de cuotas igual"><input type="checkbox" id="tSinDes" style="width:16px;height:16px;"> Excluido de desempleo (familiar del autónomo, DA 10ª LETA)</label></div>
       <div class="fg"><label class="fl">Tipo de contrato</label><select class="fi2" id="tContrato"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option></select></div>
       <div class="fg"><label class="fl">Tipo de perceptor</label><select class="fi2" id="tTipoPerc"><option value="trabajador">Trabajador (Régimen General)</option><option value="administrador">Administrador / consejero (sin Seg. Social en nómina)</option></select></div>
       <div class="fg"><label class="fl">Jornada (%)</label><input type="number" step="0.01" class="fi2" id="tJornada" value="100"></div>
@@ -606,7 +607,7 @@ function openTrab(id){
   set("tNom",t?t.nombre||"":"");set("tDni",t?t.dni||"":"");set("tNaf",t?t.naf||"":"");
   set("tCat",t?t.categoria||"":"");set("tTipoPerc",t?t.tipoPerceptor||"trabajador":"trabajador");set("tGrupo",t?t.grupoCot||9:9);set("tAnt",t?t.antiguedad||"":"");set("tAlta",t?t.fechaAlta||"":"");set("tBaja",t?t.fechaBaja||"":"");
   document.getElementById("tContrato").value=t?t.tipoContrato||"indefinido":"indefinido";
-  set("tJornada",t?t.jornadaPct||100:100);set("tHorasSem",t&&t.horasSemana?t.horasSemana:"");
+  set("tJornada",t?t.jornadaPct||100:100);document.getElementById("tSinDes").checked=!!(t&&t.sinDesempleo);set("tHorasSem",t&&t.horasSemana?t.horasSemana:"");
   {const ds=(t&&Array.isArray(t.diasSemana)&&t.diasSemana.length)?t.diasSemana.map(Number):[1,2,3,4,5];document.querySelectorAll("#tDias input").forEach(c=>c.checked=ds.includes(Number(c.value)));}set("tIrpf",t?t.irpfPct||0:0);
   set("tSalBase",t?t.salarioBase||0:0);set("tPagasAnual",t?t.pagasAnual||0:0);
   set("tTipoSal",t&&t.tipoSalario==="diario"?"diario":"mensual");set("tNumPagas",t&&t.numPagas!=null&&t.numPagas!==""?t.numPagas:2);set("tDiasPaga",t&&t.diasPaga?t.diasPaga:30);
@@ -625,7 +626,7 @@ async function saveTrab(){
   const id=document.getElementById("tId").value||("t"+Date.now());
   await fbSet("nom_trabajadores",id,{id,empresaId:emp,nombre:nom,dni:normDni(val("tDni")),naf:val("tNaf"),unidades:((window.WT||[]).find(x=>x.id===id)||{}).unidades||{},
     categoria:val("tCat"),grupoCot:num(val("tGrupo")),antiguedad:val("tAnt"),fechaAlta:val("tAlta"),fechaBaja:val("tBaja"),tipoContrato:document.getElementById("tContrato").value,
-    jornadaPct:num(val("tJornada"))||100,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
+    jornadaPct:num(val("tJornada"))||100,sinDesempleo:document.getElementById("tSinDes").checked,horasSemana:num(val("tHorasSem"))||"",diasSemana:[...document.querySelectorAll("#tDias input:checked")].map(c=>Number(c.value)),irpfPct:num(val("tIrpf")),
     salarioBase:num(val("tSalBase")),tipoSalario:val("tTipoSal")==="diario"?"diario":"mensual",numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pagasCfg:capturePagasCfg(),
     pagasAnual:val("tTipoSal")==="diario"?pagasAnualDiario({salarioBase:num(val("tSalBase")),numPagas:num(val("tNumPagas")),diasPaga:num(val("tDiasPaga")),pluses:window._pluses||[]}):num(val("tPagasAnual")),
     pagasProrrateadas:document.getElementById("tProrrateadas").checked,pluses:window._pluses||[],tipoPerceptor:document.getElementById("tTipoPerc").value});
@@ -673,15 +674,15 @@ function calc(t,emp,mi,horasOverride){
   baseCC=r2(baseCC);
   const baseIRPF=r2(irpfMens+prorra);
   const temp=t.tipoContrato==="temporal";
-  const cc=r2(baseCC*R.trabCC/100),des=r2(baseCC*(temp?R.trabDesTemp:R.trabDesInd)/100),fp=r2(baseCC*R.trabFP/100),mei=r2(baseCC*R.trabMEI/100);
+  const cc=r2(baseCC*R.trabCC/100),des=t.sinDesempleo?0:r2(baseCC*(temp?R.trabDesTemp:R.trabDesInd)/100),fp=r2(baseCC*R.trabFP/100),mei=r2(baseCC*R.trabMEI/100);
   const cotTrab=r2(cc+des+fp+mei);
   const irpf=r2(baseIRPF*num(t.irpfPct)/100);
-  const tTrab=R.trabCC+(temp?R.trabDesTemp:R.trabDesInd)+R.trabFP+R.trabMEI;
+  const tTrab=R.trabCC+(t.sinDesempleo?0:(temp?R.trabDesTemp:R.trabDesInd))+R.trabFP+R.trabMEI;
   const cotAtr=r2(baseAtrL03*tTrab/100);                     // aportación del trabajador sobre atrasos (se ingresa en la L03)
   const deducir=r2(cotTrab+cotAtr+irpf);
   const liquido=r2(devengo-deducir);
   const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
-  const eCC=r2(baseCC*R.empCC/100),eDes=r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
+  const eCC=r2(baseCC*R.empCC/100),eDes=t.sinDesempleo?0:r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
   const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
   return {P,salBase,pl,atrasosL03,baseAtrL03,cotAtr,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
 }
@@ -728,7 +729,7 @@ function nominaHTML(t,mi){
   const P=c.P, dm=P.dm;
   const pl=c.pl;
   const temp=t.tipoContrato==="temporal";
-  const wDes=temp?R.trabDesTemp:R.trabDesInd, eDesR=temp?R.empDesTemp:R.empDesInd;
+  const wDes=t.sinDesempleo?0:(temp?R.trabDesTemp:R.trabDesInd), eDesR=t.sinDesempleo?0:(temp?R.empDesTemp:R.empDesInd);
   const atep=num(emp.atepIT)+num(emp.atepIMS);
   const salP=pl.filter(p=>p.cotiza!==false||p.l03||p.pagaExtra), nosalP=pl.filter(p=>p.cotiza===false&&!p.l03&&!p.pagaExtra);
   const rline=(l,a)=>"<tr><td>"+l+"</td><td class='amt'>"+a+"</td></tr>";
@@ -748,7 +749,7 @@ function nominaHTML(t,mi){
     +"<tr><td colspan='3' class='subh'>1. Aportación del trabajador a la Seguridad Social</td></tr>"
     +"<tr><th style='text-align:left;'>Concepto</th><th class='pct'>%</th><th class='amt'>Importe</th></tr>"
     +pline("Contingencias comunes",pctES(R.trabCC),eur(c.cc))
-    +pline("Desempleo",pctES(wDes),eur(c.des))
+    +pline("Desempleo"+(t.sinDesempleo?" (excluido)":""),pctES(wDes),eur(c.des))
     +pline("Formación profesional",pctES(R.trabFP),eur(c.fp))
     +pline("Equidad intergeneracional (MEI)",pctES(R.trabMEI),eur(c.mei))
     +(c.cotAtr?pline("Cotización atrasos (L03)",pctES(R.trabCC+wDes+R.trabFP+R.trabMEI),eur(c.cotAtr)):"")
@@ -773,7 +774,7 @@ function nominaHTML(t,mi){
     +"<tr><td colspan='2' class='subh'>2. Contingencias profesionales y recaud. conjunta</td><td class='empb' colspan='2'>APORTACIÓN EMPRESA</td></tr>"
     +"<tr><td>Base contingencias profesionales</td><td class='amt'>"+eur(c.baseCC)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td style='padding-left:16px;'>AT y EP</td><td class='amt'></td><td class='pct'>"+pctES(atep)+" %</td><td class='amt'>"+eur(c.eAT)+"</td></tr>"
-    +"<tr><td style='padding-left:16px;'>Desempleo</td><td class='amt'></td><td class='pct'>"+pctES(eDesR)+" %</td><td class='amt'>"+eur(c.eDes)+"</td></tr>"
+    +"<tr><td style='padding-left:16px;'>Desempleo"+(t.sinDesempleo?" (excluido)":"")+"</td><td class='amt'></td><td class='pct'>"+pctES(eDesR)+" %</td><td class='amt'>"+eur(c.eDes)+"</td></tr>"
     +"<tr><td style='padding-left:16px;'>Formación profesional</td><td class='amt'></td><td class='pct'>"+pctES(R.empFP)+" %</td><td class='amt'>"+eur(c.eFP)+"</td></tr>"
     +"<tr><td style='padding-left:16px;'>Fondo Garantía Salarial</td><td class='amt'></td><td class='pct'>"+pctES(R.empFOG)+" %</td><td class='amt'>"+eur(c.eFOG)+"</td></tr>"
     +"<tr><td>5. Base sujeta a retención del I.R.P.F.</td><td class='amt'>"+eur(c.baseIRPF)+"</td><td class='pct'></td><td class='amt'></td></tr>"
@@ -960,7 +961,7 @@ function calcFiniquito(){
   // salarial sujeto a cotizacion e IRPF
   const brutoSalarial=r2(impDiasMes+impVac+pagaExtra);
   let baseCot=brutoSalarial; if(baseCot>TOPE_MAX)baseCot=TOPE_MAX;
-  const cCC=r2(baseCot*R.trabCC/100),cDes=r2(baseCot*(temp?R.trabDesTemp:R.trabDesInd)/100),cFP=r2(baseCot*R.trabFP/100),cMEI=r2(baseCot*R.trabMEI/100);
+  const cCC=r2(baseCot*R.trabCC/100),cDes=t.sinDesempleo?0:r2(baseCot*(temp?R.trabDesTemp:R.trabDesInd)/100),cFP=r2(baseCot*R.trabFP/100),cMEI=r2(baseCot*R.trabMEI/100);
   const cotTrab=r2(cCC+cDes+cFP+cMEI);
   const irpf=r2(brutoSalarial*num(t.irpfPct)/100);
   const totalDevengado=r2(brutoSalarial+indem);
@@ -1010,7 +1011,7 @@ function calcSS(){
     W.map(({t,c,temp})=>"<tr><td "+td+">"+(t.naf||"<span style='color:#B91C1C'>falta</span>")+"</td><td "+td+">"+(t.dni||"")+"</td><td "+td+">"+t.nombre+(c.minAplicada?" <span style='font-size:9px;color:#B45309;'>(base mínima)</span>":"")+"</td><td "+td+">"+(temp?"Temporal":"Indefinido")+"</td><td "+td+">"+(t.grupoCot||"")+"</td><td "+td+">"+c.P.diasNat+(c.P.completo?"":" ("+String(c.P.d1).padStart(2,"0")+"-"+String(c.P.d2).padStart(2,"0")+")")+"</td><td "+td+">"+(c.P.parcial?num(t.jornadaPct)+" % · "+String(c.P.horas).replace(".",",")+" h":"Completa")+"</td><td "+tdr+">"+eur(c.baseCC)+"</td><td "+tdr+">"+eur(c.baseCC)+"</td><td "+tdr+">"+eur(c.cotTrab)+"</td><td "+tdr+">"+eur(c.cotEmp)+"</td></tr>").join("")+
     "<tr style='font-weight:700;'><td "+td+" colspan='7'>TOTAL "+W.length+" trabajador(es)</td><td "+tdr+">"+eur(S(w=>w.c.baseCC))+"</td><td "+tdr+">"+eur(S(w=>w.c.baseCC))+"</td><td "+tdr+">"+eur(S(w=>w.c.cotTrab))+"</td><td "+tdr+">"+eur(S(w=>w.c.cotEmp))+"</td></tr></tbody></table>";
   // ---- RLC ----
-  const ind=W.filter(w=>!w.temp),tmp=W.filter(w=>w.temp);
+  const ind=W.filter(w=>!w.temp&&!w.t.sinDesempleo),tmp=W.filter(w=>w.temp&&!w.t.sinDesempleo);
   const bTot=S(w=>w.c.baseCC),bInd=r2(ind.reduce((a,w)=>a+w.c.baseCC,0)),bTmp=r2(tmp.reduce((a,w)=>a+w.c.baseCC,0));
   const L=[["Contingencias comunes",bTot,R.empCC,R.trabCC,S(w=>w.c.eCC),S(w=>w.c.cc)],
     ["Mecanismo de Equidad Intergeneracional (MEI)",bTot,R.empMEI,R.trabMEI,S(w=>w.c.eMEI),S(w=>w.c.mei)],
