@@ -102,7 +102,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18b</div></div>
+  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18d</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Despacho</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">Fiscal</a>
@@ -540,6 +540,7 @@ function tCopiarPagasConv(){
   if(!c){alert("Ni el trabajador ni su empresa tienen convenio asignado.");return;}
   const sec=cvSector(c,val("tCvCat")),src=sec&&(sec.pagas||[]).length?{pagasCfg:sec.pagas.map(p=>({n:p.n,mes:num(p.mes),dev:p.dev||"anio"})),numPagas:sec.numPagas||sec.pagas.length,diasPaga:sec.diasPaga}:c;
   renderPagasCfg(src.pagasCfg||[]);if(src.numPagas)document.getElementById("tNumPagas").value=src.numPagas;if(src.diasPaga)document.getElementById("tDiasPaga").value=src.diasPaga;
+  if(val("tTipoSal")!=="diario"&&tNumPagasUI())document.getElementById("tPagasAnual").value=tPagasEsperado();
   if(sec&&sec.prorrateo)showToastSafe("Prorrateo según convenio ("+sec.nombre+"): "+sec.prorrateo);
   if(document.getElementById("tProrrateadas").checked&&(src.pagasCfg||[]).length&&confirm("Las pagas están marcadas como prorrateadas. ¿Desmarcarlo para que se cobren en su mes?")){document.getElementById("tProrrateadas").checked=false;}
   tSalUI();
@@ -727,7 +728,9 @@ function tCvAddPlus(k){const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const sec=
   showToastSafe("Plus «"+p.nombre+"» añadido ("+String(imp).replace(".",",")+"). Revisa si cotiza/IRPF y el mes de cobro.");}
 function showToastSafe(m){if(typeof showToast==="function")showToast(m);else alert(m);}
 function tCvAplicar(){const c=cvDeEmpresa(val("tEmp"),val("tCvSel"));const r=cvSalTabla({cvCat:val("tCvCat"),jornadaPct:num(val("tJornada"))||100},c);if(!r)return;
-  document.getElementById("tTipoSal").value=r.unidad==="dia"?"diario":"mensual";document.getElementById("tSalBase").value=r.propuesto;tSalUI();tCvRef();}
+  document.getElementById("tTipoSal").value=r.unidad==="dia"?"diario":"mensual";document.getElementById("tSalBase").value=r.propuesto;
+  if(r.unidad!=="dia"&&tNumPagasUI())document.getElementById("tPagasAnual").value=tPagasEsperado();
+  tSalUI();tCvRef();}
 // ---- En la ficha del convenio: trabajadores afectados por la tabla nueva ----
 function cvAfectados(c){
   const an=cvUltAnio(c);if(!an)return [];
@@ -823,8 +826,18 @@ function tPrev(){
   const plM=pl.filter(p=>p.unidad!=="dia"&&!num(p.mes)).reduce((a,p)=>a+num(p.importe),0),plU=pl.filter(p=>num(p.mes)).reduce((a,p)=>a+num(p.importe),0);
   const pagas=(d?pagasAnualDiario(t):num(val("tPagasAnual")))*dias/diasAn;
   const anual=(d?(t.salarioBase+plD)*dias:t.salarioBase*12*dias/diasAn)+plM*12*dias/diasAn+plU+pagas;
-  box.innerHTML="Retribución anual prevista "+ANIO+(dias<diasAn?" (desde el alta, "+dias+" días)":"")+": <b>"+eur(anual)+"</b>"+(d?" &nbsp;·&nbsp; pagas extra: <b>"+eur(pagasAnualDiario(t))+"</b>/año ("+eur(pagasAnualDiario(t)/12)+"/mes prorrateado)":"")+" &nbsp;<span style='color:var(--gray-400);'>Orientativo para fijar el % de IRPF.</span>";
+  box.innerHTML="Retribución anual prevista "+ANIO+(dias<diasAn?" (desde el alta, "+dias+" días)":"")+": <b>"+eur(anual)+"</b>"+(d?" &nbsp;·&nbsp; pagas extra: <b>"+eur(pagasAnualDiario(t))+"</b>/año ("+eur(pagasAnualDiario(t)/12)+"/mes prorrateado)":"")+" &nbsp;<span style='color:var(--gray-400);'>Orientativo para fijar el % de IRPF.</span>"+tPagasAviso();
 }
+// Aviso si el importe ANUAL de pagas no cuadra con salario × nº de pagas (p. ej. se puso el importe de una sola paga)
+function tNumPagasUI(){const pr=(document.getElementById("tProrrateadas")||{}).checked;const cfg=typeof capturePagasCfg==="function"?capturePagasCfg().length:0;return (!pr&&cfg)?cfg:num(val("tNumPagas"));}
+function tPagasEsperado(){const np=tNumPagasUI(),dp=num(val("tDiasPaga"))||30;return np?r2(num(val("tSalBase"))*np*dp/30):0;}
+function tPagasAviso(){
+  if((document.getElementById("tTipoSal")||{}).value==="diario")return "";
+  const esp=tPagasEsperado(),act=num(val("tPagasAnual"));if(!esp||Math.abs(esp-act)<0.01)return "";
+  return "<div style='margin-top:6px;padding:6px 8px;border-radius:6px;background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;'>⚠ Importe anual de pagas: <b>"+eur(act)+"</b>, pero salario × "+tNumPagasUI()+" pagas"+(num(val("tDiasPaga"))&&num(val("tDiasPaga"))!==30?" × "+num(val("tDiasPaga"))+"/30 días":"")+" = <b>"+eur(esp)+"</b>. Es el total de TODAS las pagas del año (la base cotiza 1/12 cada mes). Si las pagas llevan antigüedad u otros conceptos, puede ser mayor. <button type='button' class='btn btn-secondary btn-sm' onclick='tPagasAjustar()'>Poner "+eur(esp)+"</button></div>";
+}
+function tPagasAjustar(){document.getElementById("tPagasAnual").value=tPagasEsperado();tPrev();}
+window.tPagasAjustar=tPagasAjustar;
 window.tSalUI=tSalUI;window.tPrev=tPrev;
 function capturePluses(){
   window._pluses=[].map.call(document.querySelectorAll("#tPluses .plusrow"),row=>({
@@ -845,7 +858,7 @@ function renderPluses(){
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;' title='Salario diario: el plus entra en el importe de cada paga extra (días por paga × €/día)'><input class='pp' type='checkbox' onchange='tPrev()' "+(p.enPagas!==false?"checked":"")+"> en pagas</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pc' type='checkbox' "+(p.cotiza!==false?"checked":"")+"> cotiza</label>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;'><input class='pr' type='checkbox' "+(p.irpf!==false?"checked":"")+"> IRPF</label>"+
-    "<select class='pm fi2' style='width:auto;font-size:11px;' title='Mes en que se paga (vacío = todos los meses)'><option value=''>Todos los meses</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(p.mes)===k+1?" selected":"")+">Solo "+m.toLowerCase()+"</option>").join("")+"</select>"+
+    "<select class='pm fi2' style='width:auto;font-size:11px;' title='Mes en que se paga (vacío = todos los meses). Si cotiza, no suma entero a la base de ese mes: cotiza su prorrata (importe/12) todos los meses'><option value=''>Todos los meses</option>"+MESES.map((m,k)=>"<option value='"+(k+1)+"'"+(num(p.mes)===k+1?" selected":"")+">Solo "+m.toLowerCase()+"</option>").join("")+"</select>"+
     "<label style='font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:3px;' title='Atrasos de meses anteriores: tributan IRPF este mes pero cotizan aparte en liquidación complementaria L03 (no suman a la base de este mes)'><input class='pl' type='checkbox' "+(p.l03?"checked":"")+"> atrasos (L03)</label>"+
     "<input class='pb fi2' style='width:96px;font-size:11px;' type='number' step='0.01' title='Solo atrasos: suma de las bases que se cotizan en las L03, si no coincide con el importe de los atrasos (p. ej. porque algún mes ya cotizó por la base mínima). Vacío = igual al importe.' placeholder='base L03' value='"+(p.baseL03!=null?p.baseL03:"")+"'>"+
     "<button type='button' class='btn btn-secondary btn-sm' style='color:var(--danger);' onclick='removePlus("+i+")'>✕</button></div>").join(""):
@@ -911,16 +924,20 @@ function calc(t,emp,mi,horasOverride){
     .concat(P.diasNat>0?pagasDelMes(t,mi):[]);
   const salBase=diario?r2(num(t.salarioBase)*P.diasNat):r2(num(t.salarioBase)*f);
   const sumP=g=>pl.filter(g).reduce((s,p)=>s+num(p.importe),0);
-  const salariales=salBase+sumP(p=>p.cotiza!==false&&!p.l03&&!p.pagaExtra);   // cotizan este mes (la paga extra cobrada en su mes no: ya cotiza con la prorrata)
+  // Pluses de un mes concreto que cotizan (bolsa de vacaciones, pagas especiales…): devengo superior al mes → cotizan prorrateados (importe/12) todos los meses, no enteros en el mes de pago
+  const plMesCot=p=>num(p.mes)&&p.cotiza!==false&&!p.l03&&!p.pagaExtra&&p.unidad!=="ud";
+  const salariales=salBase+sumP(p=>p.cotiza!==false&&!p.l03&&!p.pagaExtra&&!plMesCot(p));   // cotizan este mes (paga extra y pluses de mes concreto no: van por prorrata)
   const atrasosL03=r2(sumP(p=>p.l03));
   const baseAtrL03=r2(pl.filter(p=>p.l03).reduce((a,p)=>a+(p.baseL03!==""&&p.baseL03!=null?num(p.baseL03):num(p.importe)),0));
-  const noCotiza=sumP(p=>(p.cotiza===false||p.pagaExtra)&&!p.l03);
+  const noCotiza=sumP(p=>(p.cotiza===false||p.pagaExtra||plMesCot(p))&&!p.l03);
   const irpfMens=salBase+sumP(p=>p.irpf!==false);
   const pagasAn=diario?pagasAnualDiario(t):num(t.pagasAnual);
   const prorrata=P.completo?r2(pagasAn/12):r2(pagasAn/12*P.diasNat/P.dm);   // mes incompleto: × días naturales trabajados / días del mes
   const prorra=t.pagasProrrateadas?prorrata:0;
+  const anualPlMes=(Array.isArray(t.pluses)?t.pluses:[]).filter(plMesCot).reduce((s,p)=>s+num(p.importe),0);
+  const prorrataPlMes=P.diasNat>0?(P.completo?r2(anualPlMes/12):r2(anualPlMes/12*P.diasNat/P.dm)):0;
   const devengo=r2(salBase+pl.reduce((s,p)=>s+num(p.importe),0)+prorra);
-  const baseReal=r2(salariales+prorrata);
+  const baseReal=r2(salariales+prorrata+prorrataPlMes);
   const admin=t.tipoPerceptor==="administrador";
   const bmin=admin?0:baseMinima(t,P);
   let baseCC=Math.max(baseReal,bmin);
@@ -941,7 +958,7 @@ function calc(t,emp,mi,horasOverride){
   const it=num(emp&&emp.atepIT),ims=num(emp&&emp.atepIMS);
   const eCC=r2(baseCC*R.empCC/100),eDes=t.sinDesempleo?0:r2(baseCC*(temp?R.empDesTemp:R.empDesInd)/100),eFP=r2(baseCC*R.empFP/100),eFOG=r2(baseCC*R.empFOG/100),eMEI=r2(baseCC*R.empMEI/100),eAT=r2(baseCC*(it+ims)/100);
   const cotEmp=r2(eCC+eDes+eFP+eFOG+eMEI+eAT);
-  return {P,salBase,pl,atrasosL03,baseAtrL03,cotAtr,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
+  return {P,salBase,pl,atrasosL03,baseAtrL03,cotAtr,baseReal,bmin,minAplicada:bmin>baseReal+0.004,salariales:r2(salariales),noCotiza:r2(noCotiza),prorra:r2(prorra),devengo,prorrata:r2(prorrata),prorrataPlMes,baseCC,baseIRPF,cc,des,fp,mei,cotTrab,irpf,deducir,liquido,eCC,eDes,eFP,eFOG,eMEI,eAT,cotEmp};
 }
 window.calc=calc;
 
@@ -1023,6 +1040,7 @@ function nominaHTML(t,mi){
     +"<tr><td>Remuneración mensual</td><td class='amt'>"+eur(c.salariales)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +(c.atrasosL03?"<tr><td colspan='4' style='font-size:9.5px;color:#555;'>Atrasos ("+eur(c.atrasosL03)+") no incluidos: cotizan en las L03 de sus meses (bases L03: "+eur(c.baseAtrL03)+")</td></tr>":"")
     +"<tr><td>Prorrata pagas extraord.</td><td class='amt'>"+eur(c.prorrata)+"</td><td class='pct'></td><td class='amt'></td></tr>"
+    +(c.prorrataPlMes?"<tr><td>Prorrata pluses de pago anual</td><td class='amt'>"+eur(c.prorrataPlMes)+"</td><td class='pct'></td><td class='amt'></td></tr>":"")
     +(c.minAplicada?"<tr><td>Base mínima "+(P.parcial?"("+String(P.horas).replace(".",",")+" h × "+eur((BMIN_HORA[parseInt(t.grupoCot,10)]||BMIN_HORA_RESTO))+")":"grupo "+t.grupoCot)+"</td><td class='amt'>"+eur(c.bmin)+"</td><td class='pct'></td><td class='amt'></td></tr>":"")
     +"<tr><td>Base incapacidad temporal</td><td class='amt'>"+eur(c.baseCC)+"</td><td class='pct'></td><td class='amt'></td></tr>"
     +"<tr><td><b>Base de cotización a la S.Soc.</b></td><td class='amt'><b>"+eur(c.baseCC)+"</b></td><td class='pct'>"+pctES(R.empCC)+" %</td><td class='amt'>"+eur(c.eCC)+"</td></tr>"
