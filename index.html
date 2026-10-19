@@ -102,7 +102,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
 </div>
 <div class="topbar">
   <div class="logo-box" style="background:linear-gradient(135deg,#25406e,#16233f);">EDG</div>
-  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.18d</div></div>
+  <div><div class="logo-name">Durespin · Laboral</div><div class="logo-sub">Laboral · Nóminas y seguros sociales · v2026.10.19a</div></div>
   <div class="appswitch">
     <a href="https://duraspinvest.github.io/duraspinvest/">Despacho</a>
     <a href="https://duraspinvest.github.io/duraspinvest-iva/">Fiscal</a>
@@ -918,7 +918,7 @@ function calc(t,emp,mi,horasOverride){
   mi=mi||num((document.getElementById("nMes")||{}).value)||1;
   const P=periodoTrab(t,mi,horasOverride), f=P.dias/30;
   const diario=t.tipoSalario==="diario";
-  const pl=(Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!num(p.mes)||num(p.mes)===mi)
+  const pl=(P.diasNat>0&&Array.isArray(t.pluses)?t.pluses:[]).filter(p=>!num(p.mes)||num(p.mes)===mi)
     .map(p=>{if(p.unidad==="ud"){const q=num(((t.unidades||{})[ANIO+"-"+String(mi).padStart(2,"0")]||{})[p.nombre]);return {...p,cantidad:q,precio:num(p.importe),importe:r2(q*num(p.importe))};}
       return {...p,importe:(num(p.mes)||p.l03)?r2(num(p.importe)):(p.unidad==="dia"?r2(num(p.importe)*P.diasNat):r2(num(p.importe)*f))};}).filter(p=>p.unidad!=="ud"||p.importe)
     .concat(P.diasNat>0?pagasDelMes(t,mi):[]);
@@ -932,10 +932,12 @@ function calc(t,emp,mi,horasOverride){
   const noCotiza=sumP(p=>(p.cotiza===false||p.pagaExtra||plMesCot(p))&&!p.l03);
   const irpfMens=salBase+sumP(p=>p.irpf!==false);
   const pagasAn=diario?pagasAnualDiario(t):num(t.pagasAnual);
-  const prorrata=P.completo?r2(pagasAn/12):r2(pagasAn/12*P.diasNat/P.dm);   // mes incompleto: × días naturales trabajados / días del mes
+  // mes incompleto: salario mensual → mismo divisor que el resto de conceptos (días/30, mes comercial); salario diario → días naturales / días del mes
+  const fracMes=P.completo?1:(diario?P.diasNat/P.dm:P.dias/30);
+  const prorrata=r2(pagasAn/12*fracMes);
   const prorra=t.pagasProrrateadas?prorrata:0;
   const anualPlMes=(Array.isArray(t.pluses)?t.pluses:[]).filter(plMesCot).reduce((s,p)=>s+num(p.importe),0);
-  const prorrataPlMes=P.diasNat>0?(P.completo?r2(anualPlMes/12):r2(anualPlMes/12*P.diasNat/P.dm)):0;
+  const prorrataPlMes=P.diasNat>0?r2(anualPlMes/12*fracMes):0;
   const devengo=r2(salBase+pl.reduce((s,p)=>s+num(p.importe),0)+prorra);
   const baseReal=r2(salariales+prorrata+prorrataPlMes);
   const admin=t.tipoPerceptor==="administrador";
@@ -984,7 +986,9 @@ function calcNominaUI(){
   const hv=(document.getElementById("nHoras")||{}).value; window._nHoras=(hv===""||hv==null||v==="__todos")?null:hv;
   let ts;
   if(v==="__todos"){const e=document.getElementById("nEmp").value;ts=(window.WT||[]).filter(t=>t.empresaId===e&&periodoTrab(t,mi).diasNat>0).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));}
-  else{const t=(window.WT||[]).find(x=>x.id===v);ts=t?[t]:[];}
+  else{const t=(window.WT||[]).find(x=>x.id===v);ts=t?[t]:[];
+    if(t&&periodoTrab(t,mi).diasNat===0){const f=x=>x?String(x).split("-").reverse().join("/"):"";
+      cont.innerHTML="<div class='warn'>"+(t.nombre||"Este trabajador")+" no estaba de alta en "+MESES[mi-1].toLowerCase()+" "+ANIO+(t.fechaAlta?" (alta "+f(t.fechaAlta)+")":"")+(t.fechaBaja?" (baja "+f(t.fechaBaja)+")":"")+": no hay nómina de ese mes.</div>";return;}}
   if(!ts.length){cont.innerHTML="<div class='warn'>Selecciona un trabajador.</div>";return;}
   const mk=ANIO+"-"+String(mi).padStart(2,"0");
   const udBox=ts.map(t=>(t.pluses||[]).filter(p=>p.unidad==="ud").map(p=>"<label style='display:flex;align-items:center;gap:6px;font-size:12px;margin:3px 10px 3px 0;'>"+(ts.length>1?"<b>"+t.nombre+"</b> · ":"")+p.nombre+" ("+eur(p.importe)+"/ud): <input type='number' step='0.01' min='0' style='width:80px;padding:4px 6px;border:1px solid #ccc;border-radius:5px;' value='"+(num(((t.unidades||{})[mk]||{})[p.nombre])||"")+"' placeholder='cantidad' onchange=\"nomUnidad('"+t.id+"','"+mk+"',"+JSON.stringify(p.nombre).replace(/"/g,"&quot;")+",this.value)\"></label>").join("")).join("");
