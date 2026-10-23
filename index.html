@@ -85,9 +85,28 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
   #printArea,#printArea *{visibility:visible;}
   #printArea{position:absolute;left:0;top:0;width:100%;}
   .no-print{display:none!important;}
-  @page{margin:12mm;}
+  /* Nómina: hoja A4 entera, sin cabecera ni pie del navegador, con los colores de pantalla */
+  #printArea .nomPag,#printArea>.nom:not([style]){box-sizing:border-box;}
+  #printArea .nomPag{padding:10mm;margin:0!important;}
+  #printArea>.nom:not([style]){margin:10mm;}
+  .nomPag>.nom,#printArea>.nom:not([style]){max-width:none;width:auto;min-height:275mm;display:flex;flex-direction:column;font-size:12.5px;border-width:1.4px;}
+  .nomPag>.nom>div:nth-child(3),#printArea>.nom:not([style])>div:nth-child(3){flex:1;}
+  .nomPag>.nom>div:nth-child(3)>div,#printArea>.nom:not([style])>div:nth-child(3)>div{display:flex;flex-direction:column;}
+  .nom td,.nom th{font-size:12px;padding:5px 8px;}
+  .nom .lbl{font-size:11.5px;padding:5px 9px;}
+  .nom .subh{font-size:11.5px;padding:4px 8px;}
+  .nom .empb{font-size:10px;}
+  .nom,.nom *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
 </style>
+<style id="pagStyle">@media print{@page{margin:12mm;}}</style>
+<script>
+window.addEventListener("beforeprint",()=>{
+  const vis=[...document.querySelectorAll("#printArea")].filter(e=>e.offsetParent!==null||e.getClientRects().length);
+  const esNom=vis.some(e=>e.querySelector(".nomPag>.nom")||e.querySelector(":scope>.nom:not([style])"));
+  document.getElementById("pagStyle").textContent="@media print{@page{size:A4;margin:"+(esNom?"0":"12mm")+";}}";
+});
+</script>
 </head>
 <body>
 <div id="loginScreen" style="position:fixed;inset:0;background:var(--navy);z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;">
