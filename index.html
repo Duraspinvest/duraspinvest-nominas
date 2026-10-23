@@ -218,13 +218,16 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-
         <div class="fg"><span class="fl">Motivo</span><select class="fi" id="fMotivo">
           <option value="voluntaria">Baja voluntaria</option>
           <option value="fin_contrato">Fin de contrato temporal</option>
-          <option value="despido">Despido</option>
+          <option value="objetivo">Despido objetivo / colectivo (20 dias/ano, max. 12 mensualidades)</option>
+          <option value="improcedente">Despido improcedente (33 dias/ano; 45 antes del 12/02/2012)</option>
+          <option value="disciplinario">Despido disciplinario procedente (sin indemnizacion)</option>
           <option value="no_supera">No superar periodo de prueba</option></select></div>
       </div>
       <div class="filtros" style="margin-top:2px;">
         <div class="fg"><span class="fl">Dias trabajados del mes de baja</span><input type="number" step="1" class="fi" id="fDiasMes" placeholder="auto" style="width:90px;"></div>
         <div class="fg"><span class="fl">Vacaciones al ano (dias)</span><input type="number" step="1" class="fi" id="fVacAnio" value="30" style="width:90px;"></div>
         <div class="fg"><span class="fl">Vacaciones ya disfrutadas (dias)</span><input type="number" step="0.01" class="fi" id="fVacDisf" value="0" style="width:90px;"></div>
+        <div class="fg"><span class="fl">Preaviso no dado (dias)</span><input type="number" step="1" class="fi" id="fPreav" value="0" style="width:80px;" title="Despido objetivo: 15 dias. Fin de contrato de mas de un ano: 15 dias. Si no se dio, se pagan los dias que falten"></div>
         <div class="fg"><span class="fl">Indemnizacion (EUR, opcional)</span><input type="number" step="0.01" class="fi" id="fIndem" placeholder="auto/0" style="width:110px;"></div>
         <div class="fg"><span class="fl">&nbsp;</span><button class="btn btn-primary" onclick="calcFiniquito()">Calcular finiquito</button></div>
       </div>
@@ -1199,6 +1202,41 @@ function parseFecha(s){ // admite yyyy-mm-dd o dd/mm/yyyy
   const d=new Date(s); return isNaN(d)?null:d;
 }
 function diasEntre(a,b){return Math.round((b-a)/86400000)+1;} // inclusive
+// Indemnizacion legal por extincion (ET art. 49.1.c, 53.1.b, 56.1 y DT 11ª Ley 3/2012).
+// Los periodos de menos de un año se prorratean por meses; la fraccion de mes cuenta como mes completo.
+function mesesServicio(desde,hasta){ // meses (fraccion = mes entero) entre dos fechas, ambas incluidas
+  if(!desde||!hasta||hasta<desde)return 0;
+  const fin=new Date(hasta.getFullYear(),hasta.getMonth(),hasta.getDate()+1); // dia siguiente al ultimo
+  let m=(fin.getFullYear()-desde.getFullYear())*12+(fin.getMonth()-desde.getMonth());
+  const cmp=new Date(desde.getFullYear(),desde.getMonth()+m,desde.getDate());
+  if(cmp>fin)m--; const resto=new Date(desde.getFullYear(),desde.getMonth()+m,desde.getDate());
+  return m+(resto<fin?1:0);
+}
+function calcIndemnizacion({motivo,alta,baja,salDia}){
+  const fmt=d=>("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();
+  const e=x=>eur(x);
+  if(!alta||!baja||!salDia)return {importe:0,nota:"",detalle:""};
+  const sd=r2(salDia), mens=sd*365/12;
+  const base="Salario diario regulador: <b>"+e(sd)+"</b> (salario anual con pagas / 365). Antiguedad: "+fmt(alta)+" a "+fmt(baja)+".";
+  if(motivo==="fin_contrato"){const m=mesesServicio(alta,baja),imp=r2(sd*12*m/12);
+    return {importe:imp,nota:"(12 dias por ano)",detalle:base+"<br>Fin de contrato temporal: 12 dias x "+(m/12).toFixed(2)+" anos ("+m+" meses) = <b>"+e(imp)+"</b>. Exenta de IRPF."};}
+  if(motivo==="objetivo"){const m=mesesServicio(alta,baja);let imp=r2(sd*20*m/12);const tope=r2(mens*12);let tx="";
+    if(imp>tope){tx=" → tope de 12 mensualidades";imp=tope;}
+    return {importe:imp,nota:"(20 dias por ano)",detalle:base+"<br>Despido objetivo: 20 dias x "+(m/12).toFixed(2)+" anos ("+m+" meses) = "+e(r2(sd*20*m/12))+tx+" = <b>"+e(imp)+"</b>.<br>Exenta de IRPF hasta este importe (art. 7.e LIRPF). Recuerda: preaviso de 15 dias y la indemnizacion se pone a disposicion al entregar la carta."};}
+  if(motivo==="improcedente"||motivo==="despido"){
+    const corte=new Date(2012,1,12); // 12/02/2012
+    let antes=0,despues=0;
+    if(alta<corte){antes=mesesServicio(alta,new Date(2012,1,11));despues=baja>=corte?mesesServicio(corte,baja):0;} else despues=mesesServicio(alta,baja);
+    const dA=45*antes/12,dD=33*despues/12;let dias=dA+dD,tx="";
+    if(antes>0){ // contrato anterior a la reforma (DT 11ª)
+      if(dias>720){ if(dA>720){dias=Math.min(dA,42*365/12);tx=" → tope: lo devengado antes del 12/02/2012 (max. 42 mensualidades)";} else {dias=720;tx=" → tope de 720 dias";} }
+    } else if(dias>24*365/12){dias=24*365/12;tx=" → tope de 24 mensualidades";}
+    const imp=r2(sd*dias);
+    return {importe:imp,nota:"(improcedente)",detalle:base+"<br>"+(antes?"Hasta 11/02/2012: 45 dias x "+(antes/12).toFixed(2)+" anos = "+dA.toFixed(2)+" dias. Desde 12/02/2012: ":"")+"33 dias x "+(despues/12).toFixed(2)+" anos = "+dD.toFixed(2)+" dias"+tx+". Total "+dias.toFixed(2)+" dias = <b>"+e(imp)+"</b>.<br>Exenta de IRPF hasta este importe si la improcedencia se reconoce en el SMAC (conciliacion) o la declara el juez; si solo la reconoce la empresa, tributa."};}
+  if(motivo==="disciplinario")return {importe:0,nota:"",detalle:"Despido disciplinario procedente: sin indemnizacion. Si luego se reconoce improcedente, elige «Despido improcedente»."};
+  return {importe:0,nota:"",detalle:""};
+}
+window.calcIndemnizacion=calcIndemnizacion;window.mesesServicio=mesesServicio;
 function calcFiniquito(){
   const t=(window.WT||[]).find(x=>x.id===document.getElementById("fTrab").value);
   const cont=document.getElementById("fRes");
@@ -1206,7 +1244,7 @@ function calcFiniquito(){
   const emp=(window.WE||{})[t.empresaId]||{};
   const baja=parseFecha(document.getElementById("fBaja").value);
   if(!baja){cont.innerHTML="<div class='warn'>Indica la fecha de baja.</div>";return;}
-  const alta=parseFecha(t.antiguedad)||new Date(baja.getFullYear(),0,1);
+  const alta=parseFecha(t.antiguedad)||parseFecha(t.fechaAlta)||new Date(baja.getFullYear(),0,1);
   const motivo=document.getElementById("fMotivo").value;
   const c=calc({...t,antiguedad:"",fechaAlta:"",fechaBaja:""},emp,1); // mes completo de referencia
   const temp=t.tipoContrato==="temporal";
@@ -1230,22 +1268,24 @@ function calcFiniquito(){
   const impVac=r2(valorDia*vacPend);
   // pagas extras pendientes (solo si NO estan prorrateadas)
   const pagaExtra=t.pagasProrrateadas?0:r2((t.tipoSalario==="diario"?pagasAnualDiario(t):num(t.pagasAnual))*diasAlta/diasAnio);
-  // indemnizacion (exenta de IRPF y no cotiza dentro de limites)
+  // indemnizacion (exenta de IRPF y no cotiza dentro de los limites legales)
   const anosServicio=diasEntre(alta,baja)/365;
+  const ind=calcIndemnizacion({motivo,alta,baja,salDia:t.tipoSalario==="diario"?valorDia:r2(c.baseReal*12/365)});
   const indRaw=document.getElementById("fIndem").value;
-  let indem=0, indemNota="";
-  if(indRaw!==""&&indRaw!=null){indem=num(indRaw);indemNota="(introducida)";}
-  else if(motivo==="fin_contrato"){indem=r2(valorDia*12*anosServicio);indemNota="(12 dias por ano)";}
-  else if(motivo==="despido"){indem=0;indemNota="(ponla a mano en el campo)";}
+  let indem=ind.importe, indemNota=ind.nota;
+  if(indRaw!==""&&indRaw!=null){indem=num(indRaw);indemNota="(introducida a mano; la legal seria "+eur(ind.importe)+")";}
+  // falta de preaviso: se paga como salario (cotiza y tributa)
+  const diasPreav=num(document.getElementById("fPreav").value);
+  const impPreav=r2(valorDia*diasPreav);
   // salarial sujeto a cotizacion e IRPF
-  const brutoSalarial=r2(impDiasMes+impVac+pagaExtra);
+  const brutoSalarial=r2(impDiasMes+impVac+pagaExtra+impPreav);
   let baseCot=brutoSalarial; if(baseCot>TOPE_MAX)baseCot=TOPE_MAX;
   const cCC=r2(baseCot*R.trabCC/100),cDes=t.sinDesempleo?0:r2(baseCot*(temp?R.trabDesTemp:R.trabDesInd)/100),cFP=r2(baseCot*R.trabFP/100),cMEI=r2(baseCot*R.trabMEI/100);
   const cotTrab=r2(cCC+cDes+cFP+cMEI);
   const irpf=r2(brutoSalarial*num(t.irpfPct)/100);
   const totalDevengado=r2(brutoSalarial+indem);
   const liquido=r2(totalDevengado-cotTrab-irpf);
-  const MOT={voluntaria:"Baja voluntaria",fin_contrato:"Fin de contrato temporal",despido:"Despido",no_supera:"No superar periodo de prueba"};
+  const MOT={voluntaria:"Baja voluntaria",fin_contrato:"Fin de contrato temporal",objetivo:"Despido objetivo",improcedente:"Despido improcedente",disciplinario:"Despido disciplinario procedente",despido:"Despido",no_supera:"No superar periodo de prueba"};
   const fmt=d=>("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();
   const rl=(l,v,extra)=>"<tr><td>"+l+(extra?" <span style='color:var(--gray-400);font-size:11px;'>"+extra+"</span>":"")+"</td><td style='text-align:right;'>"+eur(v)+"</td></tr>";
   cont.innerHTML=
@@ -1259,6 +1299,7 @@ function calcFiniquito(){
       rl("Salario dias trabajados del mes de baja",impDiasMes,diasMes+" dias x "+eur(valorDia))+
       rl("Vacaciones devengadas no disfrutadas",impVac,vacPend.toFixed(2)+" dias ("+vacDeveng.toFixed(2)+" deveng. - "+vacDisf+" disfr.)")+
       (pagaExtra>0?rl("Parte proporcional pagas extras",pagaExtra,"no prorrateadas"):"")+
+      (impPreav>0?rl("Falta de preaviso",impPreav,diasPreav+" dias x "+eur(valorDia)):"")+
       (indem>0?rl("Indemnizacion",indem,indemNota+" · exenta"):"")+
       "<tr class='tt'><td>A. Total devengado</td><td style='text-align:right;'>"+eur(totalDevengado)+"</td></tr>"+
       "<tr><td>Cotizacion S.Social (trabajador)</td><td style='text-align:right;'>&minus; "+eur(cotTrab)+"</td></tr>"+
@@ -1268,6 +1309,7 @@ function calcFiniquito(){
     "<div style='padding:14px 10px 6px;font-size:10.5px;'>Recibido el saldo y finiquito por los conceptos indicados, la parte trabajadora declara extinguida la relacion laboral y saldadas cuantas cantidades pudieran adeudarse por dicha relacion.</div>"+
     "<div style='display:flex;justify-content:space-between;padding:6px 10px 14px;font-size:10.5px;'><span>Firma y sello de la empresa</span><span>"+(emp.poblacion||"")+", "+fmt(baja)+"</span><span>Recibi (firma)</span></div>"+
     "</div></div>"+
+    (ind.detalle?"<div class='no-print' style='font-size:11.5px;margin-top:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;'><b>Calculo de la indemnizacion</b><br>"+ind.detalle+"</div>":"")+
     "<div style='font-size:11px;color:var(--gray-400);margin-top:8px;' class='no-print'>Base de cotizacion del finiquito: "+eur(baseCot)+". La indemnizacion (si la hay) va exenta de IRPF y no cotiza dentro de los limites legales; el resto (dias, vacaciones y pagas) cotiza y tributa. Si el mes de baja ya se paga con nomina aparte, pon «dias trabajados del mes» a 0.</div>";
 }
 window.calcFiniquito=calcFiniquito;
